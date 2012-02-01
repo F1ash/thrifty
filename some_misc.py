@@ -8,6 +8,7 @@ ts = rpm.TransactionSet()
 class FileSniffer():
 	def __init__(self, parent = None):
 		self.stop = False
+		self.task = {}
 
 	def __del__(self):
 		self.stop = True
@@ -15,9 +16,9 @@ class FileSniffer():
 	def detectTask(self):
 		if os.geteuid() :
 			print 'UserMode'
-			''' archivate own $NOME only '''
+			''' archivate own $HOME only '''
 			name = os.path.expanduser('~')
-			self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
+			self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
 		else :
 			print 'RootMode'
 			''' archivate ['/etc', '/var/named/chroot', '/usr/local', <all real $HOME>] '''
@@ -25,43 +26,52 @@ class FileSniffer():
 			HOMEs = []
 			## TODO : detecting HOMEs
 			for name in HOMEs :
-				self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
+				self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
 			for name in ('/etc', '/var/named/chroot', '/usr/local') :
 				if os.path.isdir(name) :
-					self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
+					self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
 
 	def runTask(self, mode = 1):
+		print self.task.keys()
 		for path in self.task.keys() :
-			if self.stop : break
-			print dateStamp(), 'create %s dirList beginnig...' % path
-			ArchiveFiles = listDir(path)
-			print dateStamp(), '%s dirList created' % path
-			if mode in (0, 1) :
-				print dateStamp(), 'beginnig...'
-				setOfAllPackageFiles = self.createSET(mode)
-				print dateStamp(), 'baseSet created'
-				unMatched = self.checkUnMatchedFiles(ArchiveFiles, setOfAllPackageFiles)
-				print dateStamp(), 'unMatched created'
-				for path_ in unMatched :
-					if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
-				print dateStamp(), 'unMatched removed'
-				#for path_ in ArchiveFiles : print path_
-				#print dateStamp(), 'matched printed'
-				nameArchive = self.task[path]
-				print dateStamp(), 'archivator runnind...'
-				self.archivator(ArchiveFiles, nameArchive)
-				print dateStamp(), '% s archivating complete' % path
-			else :
-				print dateStamp(), 'beginnig...'
-				toArchive = []
-				nameArchive = self.task[path]
-				mode = 1 if mode == 2 else 0
-				for fileName in ArchiveFiles :
-					res = self.checkWarningFile(fileName, mode)
-					if res is not None and fileName not in toArchive : toArchive.append(fileName)
-				print dateStamp(), 'matched fileList created'
-				self.archivator(toArchive, nameArchive)
-				print dateStamp(), '% s archivating complete' % path
+			try :
+				if self.stop : break
+				print dateStamp(), 'create %s dirList beginning...' % path
+				ArchiveFiles = listDir(path)
+				print dateStamp(), '%s dirList created' % path
+				if mode in (0, 1) :
+					print dateStamp(), 'beginning...'
+					setOfAllPackageFiles = self.createSET(mode)
+					print dateStamp(), 'baseSet created'
+					print dateStamp(), 'unMatched detecting...'
+					unMatched = self.checkUnMatchedFiles(ArchiveFiles, setOfAllPackageFiles)
+					print dateStamp(), 'unMatched created'
+					for path_ in unMatched :
+						if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
+					print dateStamp(), 'unMatched removed'
+					#for path_ in ArchiveFiles : print path_
+					#print dateStamp(), 'matched printed'
+					nameArchive = self.task[path]
+					print dateStamp(), 'archivator running...'
+					self.archivator(ArchiveFiles, nameArchive)
+					print dateStamp(), '%s archivating complete' % path
+				else :
+					print dateStamp(), 'beginning...'
+					toArchive = []
+					nameArchive = self.task[path]
+					mode = 1 if mode == 2 else 0
+					for fileName in ArchiveFiles :
+						res = self.checkWarningFile(fileName, mode)
+						if res is not None and fileName not in toArchive : toArchive.append(fileName)
+					print dateStamp(), 'matched fileList created'
+					self.archivator(toArchive, nameArchive)
+					print dateStamp(), '%s archivating complete' % path
+			except KeyboardInterrupt, err :
+				print err
+				self.stop = True
+			except IOError, err :
+				print err
+			finally : pass
 
 	def runFastProc(self):
 		self.detectTask()
@@ -191,6 +201,7 @@ if __name__ == '__main__':
 	try :
 		if mode.isdigit() :
 			job = FileSniffer()
+			job.detectTask()
 			job.runTask(int(mode))
 		elif mode in ('-f', '--file') :
 			fileName_ = sys.argv[2]
@@ -200,7 +211,7 @@ if __name__ == '__main__':
 			job.checkWarningFile(fileName if len(res)<1 else res[0][1], 0)
 		elif mode in ('-h', '--help') :
 			print \
-	'Description: some_misc [option] [[param]]\n\
+	'Description: thrifty [option] [[param]]\n\
 	0	-	very fast, ~200MB memory\n\
 	1	-	fast, ~150MB memory\n\
 	2	-	very slow, ~100MB memory\n\
@@ -215,4 +226,4 @@ if __name__ == '__main__':
 			print 'Brocken command'
 	except KeyboardInterrupt , err :
 		print err
-	finally : print 'Buy...'
+	finally : print 'Bye...'

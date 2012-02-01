@@ -1,223 +1,218 @@
 #!/usr/bin/python
 
-from yum.rpmsack import RPMDBPackageSack
-import sys, os.path, rpm, hashlib, time, tarfile
+from Functions import *
+import sys, os.path, rpm, tarfile
 
 ts = rpm.TransactionSet()
-sack = RPMDBPackageSack('/')
 
-class NoUsedCase(Exception): pass
+class FileSniffer():
+	def __init__(self, parent = None):
+		self.stop = False
 
-def getFI(packet, fileName, absPathMode = False):
-	mi = ts.dbMatch() if packet is None else ts.dbMatch('name', packet)
-	matched = []
-	if fileName == os.path.basename(fileName) : absPathMode = False
-	for h in mi.__iter__() :
-		## VARIANT I (data from rpm.hdr class)
-		#print "%s-%s-%s" % (h['name'], h['version'], h['release'])
-		packageName = h['name'] + '-' + h['version'] + '-' + h['release']
-		i = 0
-		for name in h['FILENAMES'] :
-			if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
-				#print name, h[1035][i]
-				matched.append((packageName, name, h[1035][i]))
-				#break
-			i += 1
-		#else : print 'Not found'
+	def __del__(self):
+		self.stop = True
 
-		'''
-		## VARIANT II (data from rpm.fi object) Memory BOMB !!!
-		fi = h.fiFromHeader()
-		for item in fi.__iter__() :
-			#print item
-			name = item[0]
-			if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
-				packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
-				#print packageName, name, item[12]
-				matched.append((packageName, name, item[12]))
-				#break
-		#else : print 'Not found'
-		'''
-	return matched
+	def detectTask(self):
+		if os.geteuid() :
+			print 'UserMode'
+			''' archivate own $NOME only '''
+			name = os.path.expanduser('~')
+			self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
+		else :
+			print 'RootMode'
+			''' archivate ['/etc', '/var/named/chroot', '/usr/local', <all real $HOME>] '''
+			''' detect real HOMEs '''
+			HOMEs = []
+			## TODO : detecting HOMEs
+			for name in HOMEs :
+				self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
+			for name in ('/etc', '/var/named/chroot', '/usr/local') :
+				if os.path.isdir(name) :
+					self.task = { name : os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'}
 
-def _yumProvidesFile(fileName_):
-	#sack = RPMDBPackageSack('/')
-	#for p in sack.simplePkgList():
-	#	print p
-	#print fileName_[:2], fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
-	fileName = fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
-	name = fileName[1:] if fileName.startswith('/') else fileName
-	#print sack.searchProvides(name)
-	#print sack.searchAll(name)
-	data = sack.getProvides(name)
-	if len(data) > 1 : raise NoUsedCase, 'RPMDBError'
-	packageName = data[data.keys()[0]][0][0] if len(data) else None
-	return packageName, name
+	def runTask(self, mode = 1):
+		for path in self.task.keys() :
+			if self.stop : break
+			print dateStamp(), 'create %s dirList beginnig...' % path
+			ArchiveFiles = listDir(path)
+			print dateStamp(), '%s dirList created' % path
+			if mode in (0, 1) :
+				print dateStamp(), 'beginnig...'
+				setOfAllPackageFiles = self.createSET(mode)
+				print dateStamp(), 'baseSet created'
+				unMatched = self.checkUnMatchedFiles(ArchiveFiles, setOfAllPackageFiles)
+				print dateStamp(), 'unMatched created'
+				for path_ in unMatched :
+					if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
+				print dateStamp(), 'unMatched removed'
+				#for path_ in ArchiveFiles : print path_
+				#print dateStamp(), 'matched printed'
+				nameArchive = self.task[path]
+				print dateStamp(), 'archivator runnind...'
+				self.archivator(ArchiveFiles, nameArchive)
+				print dateStamp(), '% s archivating complete' % path
+			else :
+				print dateStamp(), 'beginnig...'
+				toArchive = []
+				nameArchive = self.task[path]
+				mode = 1 if mode == 2 else 0
+				for fileName in ArchiveFiles :
+					res = self.checkWarningFile(fileName, mode)
+					if res is not None and fileName not in toArchive : toArchive.append(fileName)
+				print dateStamp(), 'matched fileList created'
+				self.archivator(toArchive, nameArchive)
+				print dateStamp(), '% s archivating complete' % path
 
-def fileHash(path_):
-	m = hashlib.sha256()
-	error = False
-	try :
-		with open(path_, 'rb') as f :
-			while True :
-				chunk = f.read(1024)
-				if len(chunk) > 0 : m.update(chunk)
-				else : break ## EOF
-	except IOError, err :
-		print err
-		error = True
-	finally : pass
-	return None if error else m.hexdigest()
+	def runFastProc(self):
+		self.detectTask()
+		self.runTask(0)
 
-def checkWarningFile(absPath):
-	toArchive = None
-	#fileName = os.path.basename(absPath)
-	#packet, fileName = _yumProvidesFile(fileName)
-	#print packet, fileName, 'in check'
-	res = getFI(None, absPath, True)
-	#print res, 'in check'
-	if len(res) > 1 : print 'Warning: multipackage %s' % absPath
-	elif len(res) < 1 :
-		print 'Not packaged:', absPath
-		toArchive = absPath
-	else :
-		toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
-		print 'Is packaged:', absPath, 'True' if toArchive is None else 'Danger'
-	return toArchive
+	def runNormalProc(self):
+		self.detectTask()
+		self.runTask(1)
 
-def checkProcessingFile(fileList):
-	mi = ts.dbMatch()
-	unMatched = []
-	for h in mi :
-		fi = h.fiFromHeader()
+	def runSlowProc(self):
+		self.detectTask()
+		self.runTask(2)
+
+	def runBOMBProc(self):
+		self.detectTask()
+		self.runTask(3)
+
+	def getFI(self, packet, fileName, absPathMode = False, mode = 1):
+		mi = ts.dbMatch() if packet is None else ts.dbMatch('name', packet)
+		matched = []
+		if fileName == os.path.basename(fileName) : absPathMode = False
+		if mode :
+			## VARIANT I (data from rpm.hdr class)
+			for h in mi.__iter__() :
+				if self.stop : break
+				#print "%s-%s-%s" % (h['name'], h['version'], h['release'])
+				packageName = h['name'] + '-' + h['version'] + '-' + h['release']
+				i = 0
+				for name in h['FILENAMES'] :
+					if self.stop : break
+					if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
+						#print name, h[1035][i]
+						matched.append((packageName, name, h[1035][i]))
+						#break
+					i += 1
+				#else : print 'Not found'
+		else :
+			## VARIANT II (data from rpm.fi object) Memory BOMB !!!
+			for h in mi.__iter__() :
+				if self.stop : break
+				fi = h.fiFromHeader()
+				for item in fi.__iter__() :
+					if self.stop : break
+					#print item
+					name = item[0]
+					if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
+						packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
+						#print packageName, name, item[12]
+						matched.append((packageName, name, item[12]))
+						#break
+				#else : print 'Not found'
+		return matched
+
+	def checkWarningFile(self, absPath, mode):
+		toArchive = None
+		if not self.stop : res = self.getFI(None, absPath, True, mode)
+		else : return None
+		#print res, 'in check'
+		if len(res) > 1 : print 'Warning: multipackage %s' % absPath
+		elif len(res) < 1 :
+			print 'Not packaged:', absPath
+			toArchive = absPath
+		else :
+			toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
+			print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+		return toArchive
+
+	def createSET(self, mode = 1):
+		s = {}
+		mi = ts.dbMatch()
+		if mode :
+			## fast /2min55sec:~145MB/
+			for h in mi :
+				if self.stop : break
+				i = 0
+				for name in h['FILENAMES'] :
+					if self.stop : break
+					#print name, h[1035][i]
+					if os.path.isfile(name) : s[name] = h[1035][i]
+					i += 1
+		else :
+			## very fast /1min25sec:~200MB/
+			for h in mi :
+				if self.stop : break
+				fi = h.fiFromHeader()
+				for item in fi.__iter__() :
+					if self.stop : break
+					#print item
+					name = item[0]
+					if os.path.isfile(name) : s[name] = item[12]
+		return s
+
+	def checkUnMatchedFiles(self, fileList, baseSet):
+		unMatched = []
 		for fileName in fileList :
-			unUsed = False
-			for item in fi.__iter__() :
-				#print item
-				name = item[0]
-				if os.path.isfile(name) and name == fileName :
-					#packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
-					#print packageName, name, item[12]
-					if fileHash(fileName) == item[12] :
-						unUsed = True	## checkSumm equel, not archivated
-					break
-			if unUsed and fileName not in unMatched :
-				print fileName
-				unMatched.append(fileName)
-		for fileName in unMatched and fileName in fileList : fileList.remove(fileName)
-	return unMatched
+			if self.stop : break
+			if fileName in baseSet.keys() :
+				h = fileHash(fileName)
+				if h is None or h == baseSet[fileName] :
+					unMatched.append(fileName)
+		return unMatched
 
-def createSET():
-	s = {}
-	mi = ts.dbMatch()
-	for h in mi :
-		'''
-		## very fast /1min25sec:~200MB/
-		fi = h.fiFromHeader()
-		for item in fi.__iter__() :
-			#print item
-			name = item[0]
-			if os.path.isfile(name) : s[name] = item[12]
-		'''
-		## fast /2min55sec:~145MB/
-		i = 0
-		for name in h['FILENAMES'] :
-			#print name, h[1035][i]
-			if os.path.isfile(name) : s[name] = h[1035][i]
-			i += 1
-	return s
-
-def checkUnMatchedFiles(fileList, baseSet):
-	unMatched = []
-	for fileName in fileList :
-		if fileName in baseSet.keys() :
-			h = fileHash(fileName)
-			if h is None or h == baseSet[fileName] :
-				unMatched.append(fileName)
-	return unMatched
-
-def listDir(_dir, tab = '\t'):
-	#print tab, _dir
-	List = []
-	try :
-		for name in os.listdir(_dir) :
-			path_ = os.path.join(_dir, name)
-			if os.path.islink(path_) : continue
-			if os.path.isfile(path_) :
-				#print tab + '\t', path_
-				#res = checkWarningFile(path_)
-				#if res is not None : List.append(res)
-				List.append(path_)
-			elif os.path.isdir(path_) :
-				List = List + listDir(path_, tab + '\t')
-				pass
-	except OSError, err :
-		print tab, err
-	finally : pass
-	return List
-
-def archivator(archList, nameArch, excludes = ''):
-	tar = tarfile.open(nameArch, 'w:bz2')
-	if not os.path.isfile(excludes) :
-		Excludes = []
-	else :
-		with open(excludes) as f :
-			path_ = f.read()
-			path = path_.split('\n')
-			for path_ in path :
-				if path_ not in ('', ' ', '\n') :
-					Excludes.append(path_)
-	for fileName in archList :
-		if fileName not in Excludes :
-			try :
-				tar.add(fileName)
-			except IOError, err : print err
-			finally : pass
-	tar.close()
-
-def dateStamp():
-	return time.strftime("%Y.%m.%d_%H:%M:%S", time.localtime()) + ' : '
+	def archivator(self, archList, nameArch, excludes = ''):
+		if self.stop : return
+		tar = tarfile.open(nameArch, 'w:bz2')
+		if not os.path.isfile(excludes) :
+			Excludes = []
+		else :
+			with open(excludes) as f :
+				path_ = f.read()
+				path = path_.split('\n')
+				for path_ in path :
+					if path_ not in ('', ' ', '\n') :
+						Excludes.append(path_)
+		for fileName in archList :
+			if self.stop : break
+			if fileName not in Excludes :
+				try :
+					tar.add(fileName)
+				except IOError, err : print err
+				finally : pass
+		tar.close()
+		if self.stop : os.remove(nameArch)
 
 if __name__ == '__main__':
-	'''
-	fileName = sys.argv[1]
-	packet, fileName = _yumProvidesFile(fileName)
-	print packet, fileName
-	res = getFI(packet, fileName)
-	print res
-	print checkWarningFile(fileName if len(res)<1 else res[0][1]), 'checked'
-	'''
-	if os.geteuid() : print 'UserMode'
-	else : print 'RootMode'
-
-	print dateStamp(), 'create dirList beginnig...'
-	ArchiveFiles = listDir('/etc')
-	print dateStamp(), 'dirList created'
-	
-	'''## very fast, ~200MB memory
-	print dateStamp(), 'beginnig...'
-	setOfAllPackageFiles = createSET()
-	print dateStamp(), 'baseSet created'
-	unMatched = checkUnMatchedFiles(ArchiveFiles, setOfAllPackageFiles)
-	print dateStamp(), 'unMatched created'
-	for path_ in unMatched :
-		if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
-	print dateStamp(), 'unMatched removed'
-	for path_ in ArchiveFiles : print path_
-	print dateStamp(), 'matched printed'
-	nameArchive = 'etc-some-' + dateStamp()[:19] + '.tar.bz2'
-	print dateStamp(), 'archivator runnind...'
-	archivator(ArchiveFiles, nameArchive)
-	print dateStamp(), 'archivating complete'
-	'''
-
-	## very slow, ~100MB memory
-	print dateStamp(), 'beginnig...'
-	toArchive = []
-	nameArchive = 'etc-some-' + dateStamp()[:19] + '.tar.bz2'
-	for fileName in ArchiveFiles :
-		res = checkWarningFile(fileName)
-		if res is not None and fileName not in toArchive : toArchive.append(fileName)
-	print dateStamp(), 'matched fileList created'
-	archivator(toArchive, nameArchive)
-	print dateStamp(), 'complete'
+	mode = sys.argv[1]
+	try :
+		if mode.isdigit() :
+			job = FileSniffer()
+			job.runTask(int(mode))
+		elif mode in ('-f', '--file') :
+			fileName_ = sys.argv[2]
+			fileName = fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
+			fileName = fileName[1:] if fileName.startswith('/') else fileName
+			job = FileSniffer()
+			job.checkWarningFile(fileName if len(res)<1 else res[0][1], 0)
+		elif mode in ('-h', '--help') :
+			print \
+	'Description: some_misc [option] [[param]]\n\
+	0	-	very fast, ~200MB memory\n\
+	1	-	fast, ~150MB memory\n\
+	2	-	very slow, ~100MB memory\n\
+	<N>\n\
+		-	deprecated, memory BOMB !\n\
+	-f (--file) file\n\
+		-	check the file provided by some package and brocken\n\
+	-h (--help)\n\
+		-	help\n\
+	'
+		else :
+			print 'Brocken command'
+	except KeyboardInterrupt , err :
+		print err
+	finally : print 'Buy...'

@@ -2,7 +2,6 @@
 
 from Functions import *
 import sys, os.path, rpm, tarfile
-import os.path, sys
 
 ts = rpm.TransactionSet()
 
@@ -137,19 +136,19 @@ class FileSniffer():
 				#else : print 'Not found'
 		return matched
 
-	def checkWarningFile(self, absPath, mode):
+	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
 		if not self.stop :
 			res = self.getFI(None, absPath, mode)
-			#print res, '----==='
+			if infoShow : print res
 			if len(res) == 1 :
 				toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
-				#print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+				if infoShow : print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
 			elif len(res) > 1 :
-				#print 'Warning: multipackage %s' % absPath
+				if infoShow : print 'Warning: multipackage %s' % absPath
 				pass
 			elif len(res) < 1 :
-				#print 'Not packaged:', absPath
+				if infoShow : print 'Not packaged:', absPath
 				toArchive = absPath
 		return toArchive
 
@@ -209,11 +208,9 @@ if __name__ == '__main__':
 			job.runTask(int(mode))
 		elif mode in ('-f', '--file') :
 			fileName = os.path.abspath(sys.argv[2]) if len(sys.argv)>2 else ''
-			print fileName
-			#fileName = fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
-			#fileName = fileName[1:] if fileName.startswith('/') else fileName
+			#print fileName
 			job = FileSniffer()
-			job.checkWarningFile(fileName, 1)
+			job.checkWarningFile(fileName, 1, True)
 		elif mode in ('-h', '--help') :
 			print \
 	'Description:\n\

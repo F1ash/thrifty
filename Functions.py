@@ -19,6 +19,18 @@ def fileHash(path_):
 	finally : pass
 	return None if error else m.hexdigest()
 
+def readExcludes(excludes):
+		if not os.path.isfile(excludes) :
+			Excludes = []
+		else :
+			with open(excludes) as f :
+				path_ = f.read()
+				path = path_.split('\n')
+				for path_ in path :
+					if path_ not in ('', ' ', '\n') :
+						Excludes.append(path_)
+		return Excludes
+
 def listDir(_dir, tab = '\t'):
 	#print tab, _dir
 	List = []

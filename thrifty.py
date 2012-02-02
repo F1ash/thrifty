@@ -2,6 +2,7 @@
 
 from Functions import *
 import sys, os.path, rpm, tarfile
+import os.path, sys
 
 ts = rpm.TransactionSet()
 
@@ -33,6 +34,7 @@ class FileSniffer():
 
 	def runTask(self, mode = 1):
 		print self.task.keys()
+		baseCreated = False
 		for path in self.task.keys() :
 			try :
 				if self.stop : break
@@ -41,7 +43,9 @@ class FileSniffer():
 				print dateStamp(), '%s dirList created' % path
 				if mode in (0, 1) :
 					print dateStamp(), 'beginning...'
-					setOfAllPackageFiles = self.createSET(mode)
+					if not baseCreated :
+						setOfAllPackageFiles = self.createSET(mode)
+						baseCreated = True
 					print dateStamp(), 'baseSet created'
 					print dateStamp(), 'unMatched detecting...'
 					unMatched = self.checkUnMatchedFiles(ArchiveFiles, setOfAllPackageFiles)
@@ -59,10 +63,15 @@ class FileSniffer():
 					print dateStamp(), 'beginning...'
 					toArchive = []
 					nameArchive = self.task[path]
-					mode = 1 if mode == 2 else 0
-					for fileName in ArchiveFiles :
-						res = self.checkWarningFile(fileName, mode)
-						if res is not None and fileName not in toArchive : toArchive.append(fileName)
+					if mode == 2 :
+						for fileName in ArchiveFiles :
+							res = self.checkWarningFile(fileName, 1)
+							if res is not None and fileName not in toArchive : toArchive.append(fileName)
+					else :
+						toArchive = self.getFI(mode = 0, dirList = ArchiveFiles)
+						for path_ in toArchive :
+							if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
+						toArchive = ArchiveFiles
 					print dateStamp(), 'matched fileList created'
 					self.archivator(toArchive, nameArchive)
 					print dateStamp(), '%s archivating complete' % path
@@ -89,24 +98,26 @@ class FileSniffer():
 		self.detectTask()
 		self.runTask(3)
 
-	def getFI(self, packet, fileName, absPathMode = False, mode = 1):
+	def getFI(self, packet = None, fileName = '', mode = 1, dirList = []):
 		mi = ts.dbMatch() if packet is None else ts.dbMatch('name', packet)
 		matched = []
-		if fileName == os.path.basename(fileName) : absPathMode = False
 		if mode :
 			## VARIANT I (data from rpm.hdr class)
 			for h in mi.__iter__() :
 				if self.stop : break
 				#print "%s-%s-%s" % (h['name'], h['version'], h['release'])
-				packageName = h['name'] + '-' + h['version'] + '-' + h['release']
-				i = 0
-				for name in h['FILENAMES'] :
-					if self.stop : break
-					if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
-						#print name, h[1035][i]
-						matched.append((packageName, name, h[1035][i]))
-						#break
-					i += 1
+				#packageName = h['name'] + '-' + h['version'] + '-' + h['release']
+				#i = 0
+				#for name in h['FILENAMES'] :
+				#	if self.stop : break
+				#	if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
+				#		#print name, h[1035][i]
+				#		matched.append((packageName, name, h[1035][i]))
+				#		#break
+				#	i += 1
+				if fileName in h['FILENAMES'] :
+					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
+					matched.append((packageName, fileName, h[1035][h['FILENAMES'].index(fileName)]))
 				#else : print 'Not found'
 		else :
 			## VARIANT II (data from rpm.fi object) Memory BOMB !!!
@@ -117,26 +128,29 @@ class FileSniffer():
 					if self.stop : break
 					#print item
 					name = item[0]
-					if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
-						packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
-						#print packageName, name, item[12]
-						matched.append((packageName, name, item[12]))
-						#break
+					if name in dirList :
+						if fileHash(name) == item[12] :
+							#packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
+							#print packageName, name, item[12]
+							matched.append(name)
+							#break
 				#else : print 'Not found'
 		return matched
 
 	def checkWarningFile(self, absPath, mode):
 		toArchive = None
-		if not self.stop : res = self.getFI(None, absPath, True, mode)
-		else : return None
-		#print res, 'in check'
-		if len(res) > 1 : print 'Warning: multipackage %s' % absPath
-		elif len(res) < 1 :
-			print 'Not packaged:', absPath
-			toArchive = absPath
-		else :
-			toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
-			print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+		if not self.stop :
+			res = self.getFI(None, absPath, mode)
+			#print res, '----==='
+			if len(res) == 1 :
+				toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
+				#print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+			elif len(res) > 1 :
+				#print 'Warning: multipackage %s' % absPath
+				pass
+			elif len(res) < 1 :
+				#print 'Not packaged:', absPath
+				toArchive = absPath
 		return toArchive
 
 	def createSET(self, mode = 1):
@@ -177,22 +191,12 @@ class FileSniffer():
 	def archivator(self, archList, nameArch, excludes = ''):
 		if self.stop : return
 		tar = tarfile.open(nameArch, 'w:bz2')
-		if not os.path.isfile(excludes) :
-			Excludes = []
-		else :
-			with open(excludes) as f :
-				path_ = f.read()
-				path = path_.split('\n')
-				for path_ in path :
-					if path_ not in ('', ' ', '\n') :
-						Excludes.append(path_)
 		for fileName in archList :
 			if self.stop : break
-			if fileName not in Excludes :
-				try :
-					tar.add(fileName)
-				except IOError, err : print err
-				finally : pass
+			try :
+				tar.add(fileName)
+			except IOError, err : print err
+			finally : pass
 		tar.close()
 		if self.stop : os.remove(nameArch)
 
@@ -204,23 +208,25 @@ if __name__ == '__main__':
 			job.detectTask()
 			job.runTask(int(mode))
 		elif mode in ('-f', '--file') :
-			fileName_ = sys.argv[2]
-			fileName = fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
-			fileName = fileName[1:] if fileName.startswith('/') else fileName
+			fileName = os.path.abspath(sys.argv[2]) if len(sys.argv)>2 else ''
+			print fileName
+			#fileName = fileName_[2:] if fileName_[:2] in ['~/', '*/', './', '?/'] else fileName_
+			#fileName = fileName[1:] if fileName.startswith('/') else fileName
 			job = FileSniffer()
-			job.checkWarningFile(fileName if len(res)<1 else res[0][1], 0)
+			job.checkWarningFile(fileName, 1)
 		elif mode in ('-h', '--help') :
 			print \
-	'Description: thrifty [option] [[param]]\n\
-	0	-	very fast, ~200MB memory\n\
-	1	-	fast, ~150MB memory\n\
-	2	-	very slow, ~100MB memory\n\
-	<N>\n\
-		-	deprecated, memory BOMB !\n\
-	-f (--file) file\n\
-		-	check the file provided by some package and brocken\n\
-	-h (--help)\n\
-		-	help\n\
+	'Description:\n\
+	thrifty [option] [[param]]\n\
+		0	-	very fast, ~200MB memory\n\
+		1	-	fast, ~150MB memory\n\
+		2	-	very slow, ~100MB memory\n\
+		3	-	super fast, ~200MB !\n\
+		param is a [-e file_name]\n\
+			-	added file of excepted path\n\
+	thrifty -f (--file) file\n\
+			-	check the file (abspath) provided by some package and brocken\n\
+		-h (--help)	-	help\n\
 	'
 		else :
 			print 'Brocken command'

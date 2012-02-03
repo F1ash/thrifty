@@ -176,7 +176,7 @@ class FileSniffer():
 					unMatched.append(fileName)
 		return unMatched
 
-	def archivator(self, archList, nameArch, excludes = ''):
+	def archivator(self, archList, nameArch):
 		if self.stop : return
 		tar = tarfile.open(os.path.join('/tmp', nameArch), 'w:bz2')
 		for fileName in archList :

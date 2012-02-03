@@ -203,16 +203,18 @@ if __name__ == '__main__':
 		elif mode in ('-h', '--help') :
 			print \
 	'Description:\n\
-	thrifty [option] [[param]]\n\
+	thrifty [option]\n\
 		0	-	very fast, ~200MB memory\n\
 		1	-	fast, ~150MB memory\n\
 		2	-	very slow, ~100MB memory\n\
 		3	-	super fast, ~200MB !\n\
-		param is a [-e file_name]\n\
-			-	added file of excepted path\n\
+		Excludes specified in\n\
+				/etc/thrifty.excludes\n\
+				~/.config/thrifty/thrifty.excludes\n\
 	thrifty -f (--file) file\n\
 			-	check the file (abspath) provided by some package and brocken\n\
-		-h (--help)	-	help\n\
+		-h (--help)\n\
+			-	help\n\
 	'
 		else :
 			print 'Brocken command'

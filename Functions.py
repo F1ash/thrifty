@@ -41,18 +41,17 @@ def readExcludes(excludes, HOME = None):
 			path_ = f.read()
 			path = path_.split('\n')
 			for path_ in path :
-				if path_ not in ('', ' ', '\n') and \
-						 not path_.startswith('#') :
+				if path_ not in ('', ' ', '\n') and not path_.startswith('#') :
 					if   path_.startswith('/') : Excludes.append(path_)
 					elif path_.startswith('~/') and HOME is not None :
-						Excludes.append(os.path.join(HOME, path_))
+						Excludes.append(os.path.join(HOME, path_[2:]))
 					else : pass
 	return Excludes
 
 def excludesActivate(HOME = None):
 	Excludes = []
 	if os.path.isfile('/etc/thrifty.excludes') :
-		Excludes.append(readExcludes('/etc/thrifty.excludes'))
+		Excludes.append(readExcludes('/etc/thrifty.excludes', HOME))
 	elif not USEREUID :
 		with open('/etc/thrifty.excludes', 'wb') as f : pass
 	path_ = os.path.join(HOME, '.config', 'thrifty', 'thrifty.excludes') \

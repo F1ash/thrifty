@@ -34,20 +34,20 @@ def fileHash(path_):
 	return None if error else m.hexdigest()
 
 def readExcludes(excludes, HOME = None):
-		if not os.path.isfile(excludes) :
-			Excludes = []
-		else :
-			with open(excludes, 'rb') as f :
-				path_ = f.read()
-				path = path_.split('\n')
-				for path_ in path :
-					if path_ not in ('', ' ', '\n') and \
-							 not path_.startswith('#') :
-						if   path_.startswith('/') : Excludes.append(path_)
-						elif path_.startswith('~/') and HOME is not None :
-							Excludes.append(os.path.join(HOME, path_))
-						else : pass
-		return Excludes
+	if not os.path.isfile(excludes) :
+		Excludes = []
+	else :
+		with open(excludes, 'rb') as f :
+			path_ = f.read()
+			path = path_.split('\n')
+			for path_ in path :
+				if path_ not in ('', ' ', '\n') and \
+						 not path_.startswith('#') :
+					if   path_.startswith('/') : Excludes.append(path_)
+					elif path_.startswith('~/') and HOME is not None :
+						Excludes.append(os.path.join(HOME, path_))
+					else : pass
+	return Excludes
 
 def excludesActivate(HOME = None):
 	Excludes = []
@@ -58,7 +58,7 @@ def excludesActivate(HOME = None):
 	path_ = os.path.join(HOME, '.config', 'thrifty', 'thrifty.excludes') \
 			if HOME is not None else os.path.expanduser('~/.config/thrifty/thrifty.excludes')
 	if os.path.isfile(path_) :
-		Excludes.append(readExcludes(path_), HOME)
+		Excludes.append(readExcludes(path_, HOME))
 	elif USEREUID and HOME is not None :
 		if not os.path.isdir(os.path.join(HOME, '.config', 'thrifty')) :
 			os.makedirs(os.path.join(HOME, '.config', 'thrifty'))

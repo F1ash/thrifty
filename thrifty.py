@@ -14,7 +14,8 @@ class FileSniffer():
 		self.stop = True
 
 	def detectTask(self):
-		if os.geteuid() :
+		self.specifiedDIRs = ('/etc', '/var/named/chroot', '/usr/local')
+		if USEREUID :
 			print 'UserMode'
 			''' archivate own $HOME only '''
 			name = os.path.expanduser('~')
@@ -23,11 +24,10 @@ class FileSniffer():
 			print 'RootMode'
 			''' archivate ['/etc', '/var/named/chroot', '/usr/local', <all real $HOME>] '''
 			''' detect real HOMEs '''
-			HOMEs = []
-			## TODO : detecting HOMEs
+			HOMEs = usersHOME_Detect()
 			for name in HOMEs :
 				self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
-			for name in ('/etc', '/var/named/chroot', '/usr/local') :
+			for name in self.specifiedDIRs :
 				if os.path.isdir(name) :
 					self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
 
@@ -38,7 +38,8 @@ class FileSniffer():
 			try :
 				if self.stop : break
 				print dateStamp(), 'create %s dirList beginning...' % path
-				ArchiveFiles = listDir(path)
+				excludes = excludesActivate(None if path in self.specifiedDIRs else path)
+				ArchiveFiles = listDir(path, Excludes = excludes)
 				print dateStamp(), '%s dirList created' % path
 				if mode in (0, 1) :
 					print dateStamp(), 'beginning...'
@@ -104,16 +105,6 @@ class FileSniffer():
 			## VARIANT I (data from rpm.hdr class)
 			for h in mi.__iter__() :
 				if self.stop : break
-				#print "%s-%s-%s" % (h['name'], h['version'], h['release'])
-				#packageName = h['name'] + '-' + h['version'] + '-' + h['release']
-				#i = 0
-				#for name in h['FILENAMES'] :
-				#	if self.stop : break
-				#	if os.path.isfile(name) and (name if absPathMode else os.path.basename(name)) == fileName :
-				#		#print name, h[1035][i]
-				#		matched.append((packageName, name, h[1035][i]))
-				#		#break
-				#	i += 1
 				if fileName in h['FILENAMES'] :
 					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
 					matched.append((packageName, fileName, h[1035][h['FILENAMES'].index(fileName)]))
@@ -129,8 +120,6 @@ class FileSniffer():
 					name = item[0]
 					if name in dirList :
 						if fileHash(name) == item[12] :
-							#packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
-							#print packageName, name, item[12]
 							matched.append(name)
 							#break
 				#else : print 'Not found'
@@ -189,7 +178,7 @@ class FileSniffer():
 
 	def archivator(self, archList, nameArch, excludes = ''):
 		if self.stop : return
-		tar = tarfile.open(nameArch, 'w:bz2')
+		tar = tarfile.open(os.path.join('/tmp', nameArch), 'w:bz2')
 		for fileName in archList :
 			if self.stop : break
 			try :

@@ -52,9 +52,9 @@ def readExcludes(excludes, HOME = None):
 def excludesActivate(HOME = None):
 	Excludes = []
 	if os.path.isfile('/etc/thrifty.excludes') :
-		Excludes.append(readExcludes('/etc/thrifty.conf'))
+		Excludes.append(readExcludes('/etc/thrifty.excludes'))
 	elif not USEREUID :
-		with open('/etc/thrifty.conf', 'wb') as f : pass
+		with open('/etc/thrifty.excludes', 'wb') as f : pass
 	path_ = os.path.join(HOME, '.config', 'thrifty', 'thrifty.excludes') \
 			if HOME is not None else os.path.expanduser('~/.config/thrifty/thrifty.excludes')
 	if os.path.isfile(path_) :

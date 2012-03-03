@@ -53,29 +53,21 @@ class FileSniffer():
 					for path_ in unMatched :
 						if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
 					print dateStamp(), 'unMatched removed'
-					#for path_ in ArchiveFiles : print path_
-					#print dateStamp(), 'matched printed'
-					nameArchive = self.task[path]
-					print dateStamp(), 'archivator running...'
-					self.archivator(ArchiveFiles, nameArchive)
-					print dateStamp(), '%s archivating complete' % path
 				else :
 					print dateStamp(), 'beginning...'
 					toArchive = []
-					nameArchive = self.task[path]
 					if mode == 2 :
 						for fileName in ArchiveFiles :
 							res = self.checkWarningFile(fileName, 1)
 							if res is not None and fileName not in toArchive : toArchive.append(fileName)
+						ArchiveFiles = toArchive
 					else :
-						#toArchive = self.getFI(mode = 0, dirList = ArchiveFiles)
 						self.getFI(mode = 0, dirList = ArchiveFiles)
-						#for path_ in toArchive :
-						#	if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
-						toArchive = ArchiveFiles
 					print dateStamp(), 'matched fileList created'
-					self.archivator(toArchive, nameArchive)
-					print dateStamp(), '%s archivating complete' % path
+				nameArchive = self.task[path]
+				print dateStamp(), 'archivator running...'
+				self.archivator(ArchiveFiles, nameArchive)
+				print dateStamp(), '%s archivating complete' % path
 			except KeyboardInterrupt, err :
 				print err
 				self.stop = True
@@ -108,14 +100,16 @@ class FileSniffer():
 			for path_ in dirPath :
 				CleanedFiles = CleanedFiles + listTDir(path_, Targets = targets)
 			print dateStamp(), 'dirList created'
-			#unMatched = self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
 			self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
-			#for path_ in unMatched :
-			#	if path_ in CleanedFiles : CleanedFiles.remove(path_)
 			print dateStamp(), 'matched fileList created'
 			count, size = self.cleaner(CleanedFiles)
 			print dateStamp(), 'Cleaning is complete.\n'
 			print 'Removed %s files; Released %s Byte(s)\n' % (count, size)
+			log = 'thrifty_'+ dateStamp()[:-3]
+			with open(log, 'ab') as f :
+				for path_ in CleanedFiles :
+					f.write(path_ + '\n')
+			print 'Log in : ./%s' % log
 		except KeyboardInterrupt, err :
 			print err
 			self.stop = True
@@ -136,9 +130,9 @@ class FileSniffer():
 
 	def getFI(self, packet = None, fileName = '', mode = 1, dirList = [], sensitivity = True):
 		mi = ts.dbMatch() if packet is None else ts.dbMatch('name', packet)
-		matched = []
 		if mode :
 			## VARIANT I (data from rpm.hdr class)
+			matched = []
 			for h in mi.__iter__() :
 				if self.stop : break
 				if fileName in h['FILENAMES'] :
@@ -157,12 +151,9 @@ class FileSniffer():
 					name = item[0]
 					if name in dirList :
 						if not sensitivity :
-							#matched.append(name)
 							dirList.remove(name)
 						elif fileHash(name) == item[12] :
-							#matched.append(name)
 							dirList.remove(name)
-		#return matched
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
@@ -226,6 +217,12 @@ class FileSniffer():
 			finally : pass
 		tar.close()
 		if self.stop : os.remove(nameArch)
+		else :
+			log = 'thrifty_'+ dateStamp()[:-3]
+			with open(log, 'ab') as f :
+				for path_ in archList :
+					f.write(path_ + '\n')
+			print 'Log in : ./%s' % log
 
 if __name__ == '__main__':
 	mode = sys.argv[1]

@@ -30,7 +30,7 @@ Thrifty
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/%{_datadir}/%{name}
 install -D -m 755 -p %{name} $RPM_BUILD_ROOT/%{_bindir}/%{name}
-install -D -m 644 -p %{name}.py $RPM_BUILD_ROOT/%{_datadir}/%{name}/
+install -D -m 755 -p %{name}.py $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 install -D -m 644 -p Functions.py $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 
 %files

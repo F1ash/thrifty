@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from Functions import *
+from Thrifty.Functions import *
 import os, sys, os.path, rpm, tarfile
 
 ts = rpm.TransactionSet()
@@ -105,11 +105,11 @@ class FileSniffer():
 			count, size = self.cleaner(CleanedFiles)
 			print dateStamp(), 'Cleaning is complete.\n'
 			print 'Removed %s files; Released %s Byte(s)\n' % (count, size)
-			log = 'thrifty_'+ dateStamp()[:-3]
+			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
 			with open(log, 'ab') as f :
 				for path_ in CleanedFiles :
 					f.write(path_ + '\n')
-			print 'Log in : ./%s' % log
+			print 'Log in : %s' % log
 		except KeyboardInterrupt, err :
 			print err
 			self.stop = True
@@ -218,11 +218,11 @@ class FileSniffer():
 		tar.close()
 		if self.stop : os.remove(nameArch)
 		else :
-			log = 'thrifty_'+ dateStamp()[:-3]
+			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
 			with open(log, 'ab') as f :
 				for path_ in archList :
 					f.write(path_ + '\n')
-			print 'Log in : ./%s' % log
+			print 'Log in : %s' % log
 
 if __name__ == '__main__':
 	mode = sys.argv[1]

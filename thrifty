@@ -1,0 +1,2 @@
+#!/bin/bash
+/usr/share/thrifty/thrifty.py "$@"

@@ -249,6 +249,8 @@ if __name__ == '__main__':
 		elif mode in ('-h', '--help') :
 			print \
 	'Description:\n\
+	Utility for archiving or cleaning "rpmdb-out" files.\n\
+	\n\
 	thrifty [option]\n\
 		0	-	very fast, ~200MB memory\n\
 		1	-	fast, ~150MB memory\n\
@@ -258,13 +260,13 @@ if __name__ == '__main__':
 				/etc/thrifty.excludes\n\
 				~/.config/thrifty/thrifty.excludes\n\
 		-c (--clean) [dir0 dir1 .. dirN]\n\
-			-	delete all (NOTE THIS!) unpackage files from [dir0 dir1 .. dirN]\
+			-	delete all (NOTE THIS!) "rpmdb-out" files from [dir0 dir1 .. dirN]\n\
 		Targets specified in\n\
-		(If specified then the util will be delete rpmdb-out files which contain\
-		in path "target" string only, else -- delete all rpmdb-out files)\
+		(If specified then the utility will be delete "rpmdb-out" files which contain\n\
+		in path "target" string only, else -- delete all "rpmdb-out" files)\n\
 				/etc/thrifty.targets\n\
 				~/.config/thrifty/thrifty.targets\n\
-				\
+				\n\
 	thrifty -f (--file) file\n\
 			-	check the file (abspath) provided by some package and brocken\n\
 		-h (--help)\n\

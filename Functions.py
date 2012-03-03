@@ -64,6 +64,9 @@ def excludesActivate(HOME = None):
 		with open(path_, 'wb') as f : pass
 	return Excludes
 
+def readTargets():
+	return []
+
 def listDir(_dir, tab = '\t', Excludes = []):
 	#print tab, _dir
 	List = []
@@ -75,6 +78,30 @@ def listDir(_dir, tab = '\t', Excludes = []):
 				if path_ not in Excludes : List.append(path_)
 			elif os.path.isdir(path_) and path_ not in Excludes :
 				List = List + listDir(path_, tab + '\t', Excludes)
+	except OSError, err :
+		print tab, err
+	finally : pass
+	return List
+
+def listTDir(_dir, tab = '\t', Targets = []):
+	#print tab, _dir
+	List = []
+	try :
+		for name in os.listdir(_dir) :
+			path_ = os.path.join(_dir, name)
+			if os.path.islink(path_) : continue	## links ignored
+			if os.path.isfile(path_) :
+				if Targets == [] :
+					List.append(path_)
+				else :
+					for target in Targets :
+						if path_.count(target) :
+							List.append(path_)
+							break
+			elif os.path.isdir(path_) :
+				if Targets == [] : List = List + listTDir(path_, tab + '\t', Targets)
+				elif path_.count(path_) :
+					List = List + listTDir(path_, tab + '\t', Targets)
 	except OSError, err :
 		print tab, err
 	finally : pass

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from Functions import *
-import sys, os.path, rpm, tarfile
+import os, sys, os.path, rpm, tarfile
 
 ts = rpm.TransactionSet()
 
@@ -98,7 +98,40 @@ class FileSniffer():
 		self.detectTask()
 		self.runTask(3)
 
-	def getFI(self, packet = None, fileName = '', mode = 1, dirList = []):
+	def cleanTask(self, dirPath = []):
+		print "CleanUp :\n", dirPath
+		try :
+			print dateStamp(), 'create dirList beginning...'
+			targets = readTargets()
+			CleanedFiles = []
+			for path_ in dirPath :
+				CleanedFiles = CleanedFiles + listTDir(path_, Targets = targets)
+			unMatched = self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
+			for path_ in unMatched :
+				if path_ in CleanedFiles : CleanedFiles.remove(path_)
+			print dateStamp(), 'matched fileList created'
+			count, size = self.cleaner(CleanedFiles)
+			print dateStamp(), 'Cleaning is complete.\n'
+			print 'Removed %s files; Released %s Byte(s)\n' % (count, size)
+		except KeyboardInterrupt, err :
+			print err
+			self.stop = True
+		except IOError, err :
+			print err
+		finally : pass
+
+	def cleaner(self, cleaned = []):
+		count = 0
+		size = 0
+		for path_ in cleaned :
+			if not self.stop and os.path.isfile(path_) :
+				size += os.path.getsize(path_)
+				os.remove(path_)
+				count += 1
+			elif self.stop : break
+		return count, size
+
+	def getFI(self, packet = None, fileName = '', mode = 1, dirList = [], sensitivity = True):
 		mi = ts.dbMatch() if packet is None else ts.dbMatch('name', packet)
 		matched = []
 		if mode :
@@ -119,7 +152,9 @@ class FileSniffer():
 					#print item
 					name = item[0]
 					if name in dirList :
-						if fileHash(name) == item[12] :
+						if not sensitivity :
+							matched.append(name)
+						elif fileHash(name) == item[12] :
 							matched.append(name)
 							#break
 				#else : print 'Not found'
@@ -200,6 +235,13 @@ if __name__ == '__main__':
 			#print fileName
 			job = FileSniffer()
 			job.checkWarningFile(fileName, 1, True)
+		elif mode in ('-c', '--clean') :
+			if USEREUID :
+				print 'RootMode necessary for clean.'
+			else :
+				dirPath = sys.argv[2:]
+				job = FileSniffer()
+				job.cleanTask(dirPath)
 		elif mode in ('-h', '--help') :
 			print \
 	'Description:\n\
@@ -211,6 +253,14 @@ if __name__ == '__main__':
 		Excludes specified in\n\
 				/etc/thrifty.excludes\n\
 				~/.config/thrifty/thrifty.excludes\n\
+		-c (--clean) [dir0 dir1 .. dirN]\n\
+			-	delete all (NOTE THIS!) unpackage files from [dir0 dir1 .. dirN]\
+		Targets specified in\n\
+		(If specified then the util will be delete rpmdb-out files which contain\
+		in path "target" string only, else -- delete all rpmdb-out files)\
+				/etc/thrifty.targets\n\
+				~/.config/thrifty/thrifty.targets\n\
+				\
 	thrifty -f (--file) file\n\
 			-	check the file (abspath) provided by some package and brocken\n\
 		-h (--help)\n\

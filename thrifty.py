@@ -68,9 +68,10 @@ class FileSniffer():
 							res = self.checkWarningFile(fileName, 1)
 							if res is not None and fileName not in toArchive : toArchive.append(fileName)
 					else :
-						toArchive = self.getFI(mode = 0, dirList = ArchiveFiles)
-						for path_ in toArchive :
-							if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
+						#toArchive = self.getFI(mode = 0, dirList = ArchiveFiles)
+						self.getFI(mode = 0, dirList = ArchiveFiles)
+						#for path_ in toArchive :
+						#	if path_ in ArchiveFiles : ArchiveFiles.remove(path_)
 						toArchive = ArchiveFiles
 					print dateStamp(), 'matched fileList created'
 					self.archivator(toArchive, nameArchive)
@@ -106,9 +107,11 @@ class FileSniffer():
 			CleanedFiles = []
 			for path_ in dirPath :
 				CleanedFiles = CleanedFiles + listTDir(path_, Targets = targets)
-			unMatched = self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
-			for path_ in unMatched :
-				if path_ in CleanedFiles : CleanedFiles.remove(path_)
+			print dateStamp(), 'dirList created'
+			#unMatched = self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
+			self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
+			#for path_ in unMatched :
+			#	if path_ in CleanedFiles : CleanedFiles.remove(path_)
 			print dateStamp(), 'matched fileList created'
 			count, size = self.cleaner(CleanedFiles)
 			print dateStamp(), 'Cleaning is complete.\n'
@@ -142,6 +145,7 @@ class FileSniffer():
 					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
 					matched.append((packageName, fileName, h[1035][h['FILENAMES'].index(fileName)]))
 				#else : print 'Not found'
+			return matched
 		else :
 			## VARIANT II (data from rpm.fi object) Memory BOMB !!!
 			for h in mi.__iter__() :
@@ -153,12 +157,12 @@ class FileSniffer():
 					name = item[0]
 					if name in dirList :
 						if not sensitivity :
-							matched.append(name)
+							#matched.append(name)
+							dirList.remove(name)
 						elif fileHash(name) == item[12] :
-							matched.append(name)
-							#break
-				#else : print 'Not found'
-		return matched
+							#matched.append(name)
+							dirList.remove(name)
+		#return matched
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None

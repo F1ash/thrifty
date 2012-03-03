@@ -65,6 +65,7 @@ def excludesActivate(HOME = None):
 	return Excludes
 
 def readTargets():
+	## TODO : return list of target string
 	return []
 
 def listDir(_dir, tab = '\t', Excludes = []):

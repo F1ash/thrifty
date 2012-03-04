@@ -1,7 +1,37 @@
 #!/usr/bin/python
 
-from Thrifty.Functions import *
+from Functions import *
 import os, sys, os.path, rpm, tarfile
+
+HELP = \
+	'Description:\n\
+	Utility for archiving or cleaning "rpmdb-out" files.\n\
+	\n\
+	thrifty [option]\n\
+		0	-	very fast, ~200MB memory\n\
+		1	-	fast, ~150MB memory\n\
+		2	-	very slow, ~100MB memory\n\
+		3	-	super fast, ~200MB !\n\
+			Excludes specified in\n\
+				/etc/thrifty.excludes\n\
+				~/.config/thrifty/thrifty.excludes\n\
+		-c (--clean) [dir0 dir1 .. dirN]\n\
+			-	delete all (NOTE THIS!) "rpmdb-out" files from [dir0 dir1 .. dirN]\n\
+			Targets specified in\n\
+				/etc/thrifty.targets\n\
+			(If specified then the utility will be delete "rpmdb-out" files which contain\n\
+			in path "target" string only, else -- delete all "rpmdb-out" files.\n\
+			It`s a hard way.)\n\
+		-t (--test)) [dir0 dir1 .. dirN]\n\
+			-	like --clean , but without removing files.\n\
+			This action can be used to obtain the list of all!) "rpmdb-out" files.\n\
+			And after editing it can be recorded in the /etc/thrifty.targets\n\
+			for precise removal of files.\n\
+		-f (--file) file\n\
+			-	check the file (abspath) provided by some package and brocken\n\
+		-h (--help)\n\
+			-	help\n\
+	'
 
 ts = rpm.TransactionSet()
 
@@ -91,7 +121,7 @@ class FileSniffer():
 		self.detectTask()
 		self.runTask(3)
 
-	def cleanTask(self, dirPath = []):
+	def cleanTask(self, dirPath = [], test = False):
 		print "CleanUp :\n", dirPath
 		try :
 			print dateStamp(), 'create dirList beginning...'
@@ -102,7 +132,7 @@ class FileSniffer():
 			print dateStamp(), 'dirList created'
 			self.getFI(mode = 0, dirList = CleanedFiles, sensitivity = False)
 			print dateStamp(), 'matched fileList created'
-			count, size = self.cleaner(CleanedFiles)
+			count, size = self.cleaner(CleanedFiles, test)
 			print dateStamp(), 'Cleaning is complete.\n'
 			print 'Removed %s files; Released %s Byte(s)\n' % (count, size)
 			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
@@ -117,13 +147,13 @@ class FileSniffer():
 			print err
 		finally : pass
 
-	def cleaner(self, cleaned = []):
+	def cleaner(self, cleaned = [], test = False):
 		count = 0
 		size = 0
 		for path_ in cleaned :
 			if not self.stop and os.path.isfile(path_) :
 				size += os.path.getsize(path_)
-				os.remove(path_)
+				if not test : os.remove(path_)
 				count += 1
 			elif self.stop : break
 		return count, size
@@ -225,14 +255,15 @@ class FileSniffer():
 			print 'Log in : %s' % log
 
 if __name__ == '__main__':
-	mode = sys.argv[1]
+	parameters = sys.argv
+	mode = parameters[1] if len(parameters) > 1 else 'brocken'
 	try :
 		if mode.isdigit() :
 			job = FileSniffer()
 			job.detectTask()
 			job.runTask(int(mode))
 		elif mode in ('-f', '--file') :
-			fileName = os.path.abspath(sys.argv[2]) if len(sys.argv)>2 else ''
+			fileName = os.path.abspath(parameters[2]) if len(parameters)>2 else ''
 			#print fileName
 			job = FileSniffer()
 			job.checkWarningFile(fileName, 1, True)
@@ -240,37 +271,20 @@ if __name__ == '__main__':
 			if USEREUID :
 				print 'RootMode necessary for clean.'
 			else :
-				dirPath = sys.argv[2:]
+				dirPath = parameters[2:] if len(parameters)>2 else []
 				job = FileSniffer()
 				job.cleanTask(dirPath)
+		elif mode in ('-t', '--test') :
+			if USEREUID :
+				print 'RootMode necessary for clean.'
+			else :
+				dirPath = parameters[2:] if len(parameters)>2 else []
+				job = FileSniffer()
+				job.cleanTask(dirPath, True)
 		elif mode in ('-h', '--help') :
-			print \
-	'Description:\n\
-	Utility for archiving or cleaning "rpmdb-out" files.\n\
-	\n\
-	thrifty [option]\n\
-		0	-	very fast, ~200MB memory\n\
-		1	-	fast, ~150MB memory\n\
-		2	-	very slow, ~100MB memory\n\
-		3	-	super fast, ~200MB !\n\
-		Excludes specified in\n\
-				/etc/thrifty.excludes\n\
-				~/.config/thrifty/thrifty.excludes\n\
-		-c (--clean) [dir0 dir1 .. dirN]\n\
-			-	delete all (NOTE THIS!) "rpmdb-out" files from [dir0 dir1 .. dirN]\n\
-		Targets specified in\n\
-		(If specified then the utility will be delete "rpmdb-out" files which contain\n\
-		in path "target" string only, else -- delete all "rpmdb-out" files)\n\
-				/etc/thrifty.targets\n\
-				~/.config/thrifty/thrifty.targets\n\
-				\n\
-	thrifty -f (--file) file\n\
-			-	check the file (abspath) provided by some package and brocken\n\
-		-h (--help)\n\
-			-	help\n\
-	'
+			print HELP
 		else :
-			print 'Brocken command'
+			print 'Brocken command : %s\n%s' % (parameters, HELP)
 	except KeyboardInterrupt , err :
 		print err
 	finally : print 'Bye...'

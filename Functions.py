@@ -65,8 +65,15 @@ def excludesActivate(HOME = None):
 	return Excludes
 
 def readTargets():
-	## TODO : return list of target string
-	return []
+	targets = []
+	if os.path.isfile('/etc/thrifty.targets') :
+		with open() as f :
+			path_ = f.read()
+			path = path_.split('\n')
+			for path_ in path :
+				if path_ not in ('', ' ', '\n') and not path_.startswith('#') :
+					targets.append(path_)
+	return targets
 
 def listDir(_dir, tab = '\t', Excludes = []):
 	#print tab, _dir

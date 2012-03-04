@@ -2,7 +2,7 @@ Name: thrifty
 Version: 0.10
 Release: 1%{?dist}
 Summary: Utility for archiving or cleaning "rpmdb-out" files
-Summary(ru): Утилита для архивирования и очистки от "не-пакетных" файлов
+Summary(ru): Утилита для архивирования и очистки "не-пакетных" файлов
 Group: Applications/System
 License: GPL2+
 Source0: %{name}-%{version}.tar.bz2
@@ -19,7 +19,7 @@ Utility for archiving or cleaning "rpmdb-out" files
 
 %description -l ru
 Thrifty
-Утилита для архивирования и очистки от "не-пакетных" файлов
+Утилита для архивирования и очистки "не-пакетных" файлов
 
 %prep
 %setup -q

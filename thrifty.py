@@ -51,12 +51,12 @@ class FileSniffer():
 		self.specifiedDIRs = ('/etc', '/var/named/chroot', '/usr/local')
 		if USEREUID :
 			print 'UserMode'
-			''' archivate own $HOME only '''
+			''' archiving own $HOME only '''
 			name = os.path.expanduser('~')
 			self.task[ name ] = os.path.basename(name) + '-some-' + dateStamp()[:19] + '.tar.bz2'
 		else :
 			print 'RootMode'
-			''' archivate ['/etc', '/var/named/chroot', '/usr/local', <all real $HOME>] '''
+			''' archiving ['/etc', '/var/named/chroot', '/usr/local', <all real $HOME>] '''
 			''' detect real HOMEs '''
 			HOMEs = usersHOME_Detect()
 			for name in HOMEs :

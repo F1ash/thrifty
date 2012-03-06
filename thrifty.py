@@ -2,6 +2,12 @@
 
 from Functions import *
 import os, sys, os.path, rpm, tarfile
+from stat import S_IRUSR, S_IWUSR, S_IROTH
+
+def setFileState(name_):
+	os.chmod(name_, S_IROTH)
+	os.chmod(name_, S_IWUSR)
+	os.chmod(name_, S_IRUSR)
 
 HELP = \
 	'Description:\n\
@@ -40,9 +46,10 @@ HELP = \
 ts = rpm.TransactionSet()
 
 class FileSniffer():
-	def __init__(self, parent = None):
+	def __init__(self, save_log_name = False, parent = None):
 		self.stop = False
 		self.task = {}
+		self.save_log_name = save_log_name
 
 	def __del__(self):
 		self.stop = True
@@ -68,6 +75,7 @@ class FileSniffer():
 	def runTask(self, mode = 1):
 		print self.task.keys()
 		baseCreated = False
+		log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
 		for path in self.task.keys() :
 			try :
 				if self.stop : break
@@ -108,6 +116,17 @@ class FileSniffer():
 			except IOError, err :
 				print err
 			finally : pass
+			if self.stop() : break
+			with open(log, 'ab') as f :
+				for path_ in ArchiveFiles :
+					f.write(path_ + '\n')
+		if os.path.isfile(log) : setFileState(log)
+		if self.save_log_name :
+			name_ = '/dev/shm/thrifty.lastTask'
+			with open(name_, 'wb') as f :
+				f.write(log)
+			if os.path.isfile(name_) : setFileState(name_)
+		print 'Log in : %s' % log
 
 	def runFastProc(self):
 		self.detectTask()
@@ -143,6 +162,12 @@ class FileSniffer():
 			with open(log, 'ab') as f :
 				for path_ in CleanedFiles :
 					f.write(path_ + '\n')
+			if os.path.isfile(log) : setFileState(log)
+			if self.save_log_name :
+				name_ = '/dev/shm/thrifty.lastTask'
+				with open(name_, 'wb') as f :
+					f.write(log)
+				if os.path.isfile(name_) : setFileState(name_)
 			print 'Log in : %s' % log
 		except KeyboardInterrupt, err :
 			print err
@@ -191,17 +216,25 @@ class FileSniffer():
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
+		self._data = ('','','')
 		if not self.stop :
 			res = self.getFI(None, absPath, mode)
-			if infoShow : print res
+			if infoShow :
+				print res
+				_fileHash = fileHash(absPath)
 			if len(res) == 1 :
-				toArchive = None if fileHash(absPath) == res[0][2] else res[0][1]
-				if infoShow : print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+				toArchive = None if _fileHash == res[0][2] else res[0][1]
+				if infoShow :
+					print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+					self._data = (res[0][0], res[0][2], _fileHash if _fileHash is not None else '--')
 			elif len(res) > 1 :
-				if infoShow : print 'Warning: multipackage %s' % absPath
-				pass
+				if infoShow :
+					print 'Warning: multipackage %s' % absPath
+					self._data = ('Multipackaged', '--', _fileHash if _fileHash is not None else '--')
 			elif len(res) < 1 :
-				if infoShow : print 'Not packaged:', absPath
+				if infoShow :
+					print 'Not packaged:', absPath
+					self._data = ('Not packaded', '--', _fileHash if _fileHash is not None else '--')
 				toArchive = absPath
 		return toArchive
 
@@ -251,39 +284,43 @@ class FileSniffer():
 			finally : pass
 		tar.close()
 		if self.stop : os.remove(nameArch)
-		else :
-			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
-			with open(log, 'ab') as f :
-				for path_ in archList :
-					f.write(path_ + '\n')
-			print 'Log in : %s' % log
 
 if __name__ == '__main__':
 	parameters = sys.argv
-	mode = parameters[1] if len(parameters) > 1 else 'brocken'
+	mode_ = parameters[1] if len(parameters) > 1 else 'brocken'
+	save_log_name = False
+	if mode_.startswith('G:') :
+		save_log_name = True
+		mode = mode_.split('G:')[1]
+	else : mode = mode_
 	try :
 		if mode.isdigit() :
-			job = FileSniffer()
+			job = FileSniffer(save_log_name)
 			job.detectTask()
 			job.runTask(int(mode))
 		elif mode in ('-f', '--file') :
 			fileName = os.path.abspath(parameters[2]) if len(parameters)>2 else ''
-			#print fileName
 			job = FileSniffer()
 			job.checkWarningFile(fileName, 1, True)
+			if save_log_name :
+				name_ = '/dev/shm/thrifty.lastTask'
+				with open(name_, 'ab') as f :
+					for str_ in job._data :
+						f.write(str_ + '\n')
+				if os.path.isfile(name_) : setFileState(name_)
 		elif mode in ('-c', '--clean') :
 			if USEREUID :
 				print 'RootMode necessary for clean.'
 			else :
 				dirPath = parameters[2:] if len(parameters)>2 else []
-				job = FileSniffer()
+				job = FileSniffer(save_log_name)
 				job.cleanTask(dirPath)
 		elif mode in ('-t', '--test') :
 			if USEREUID :
 				print 'RootMode necessary for clean.'
 			else :
 				dirPath = parameters[2:] if len(parameters)>2 else []
-				job = FileSniffer()
+				job = FileSniffer(save_log_name)
 				job.cleanTask(dirPath, True)
 		elif mode in ('-h', '--help') :
 			print HELP

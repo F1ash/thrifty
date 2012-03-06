@@ -34,9 +34,8 @@ def fileHash(path_):
 	return None if error else m.hexdigest()
 
 def readExcludes(excludes, HOME = None):
-	if not os.path.isfile(excludes) :
-		Excludes = []
-	else :
+	Excludes = []
+	if os.path.isfile(excludes) :
 		with open(excludes, 'rb') as f :
 			path_ = f.read()
 			path = path_.split('\n')

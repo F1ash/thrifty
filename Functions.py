@@ -2,6 +2,8 @@
 import os.path, hashlib, time, pwd
 
 USEREUID = os.geteuid()
+USER_UID = pwd.getpwnam(os.getlogin())[2]
+USER_GID = pwd.getpwnam(os.getlogin())[3]
 
 def usersHOME_Detect():
 	userHOMEs = []

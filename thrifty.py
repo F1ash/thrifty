@@ -2,12 +2,11 @@
 
 from Functions import *
 import os, sys, os.path, rpm, tarfile
-from stat import S_IRUSR, S_IWUSR, S_IROTH
+from stat import S_IRUSR, S_IWUSR, S_IRGRP, S_IWGRP, S_IROTH, S_IWOTH
 
 def setFileState(name_):
-	os.chmod(name_, S_IROTH)
-	os.chmod(name_, S_IWUSR)
-	os.chmod(name_, S_IRUSR)
+	os.chmod(name_, S_IROTH | S_IWUSR |  S_IRGRP | S_IWGRP | S_IRUSR | S_IWOTH)
+	os.chown(name_, USER_UID, USER_GID)
 
 HELP = \
 	'Description:\n\
@@ -116,7 +115,7 @@ class FileSniffer():
 			except IOError, err :
 				print err
 			finally : pass
-			if self.stop() : break
+			if self.stop : break
 			with open(log, 'ab') as f :
 				for path_ in ArchiveFiles :
 					f.write(path_ + '\n')

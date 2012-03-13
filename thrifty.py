@@ -165,7 +165,7 @@ class FileSniffer():
 			if self.save_log_name :
 				name_ = '/dev/shm/thrifty.lastTask'
 				with open(name_, 'wb') as f :
-					f.write(log)
+					f.write(log + '\n' + str(count)  + '\n' + str(size))
 				if os.path.isfile(name_) : setFileState(name_)
 			print 'Log in : %s' % log
 		except KeyboardInterrupt, err :
@@ -284,14 +284,21 @@ class FileSniffer():
 		tar.close()
 		if self.stop : os.remove(nameArch)
 
+def __del__():
+	global job
+	job.__del__()
+
 if __name__ == '__main__':
 	parameters = sys.argv
 	mode_ = parameters[1] if len(parameters) > 1 else 'brocken'
 	save_log_name = False
 	if mode_.startswith('G:') :
 		save_log_name = True
-		mode = mode_.split('G:')[1]
+		mode_raw = mode_.split('G:')[1]
+		userID, mode = mode_raw.split('::')
+		USER_UID, USER_GID = userId(userID)
 	else : mode = mode_
+	global job
 	try :
 		if mode.isdigit() :
 			job = FileSniffer(save_log_name)

@@ -1,9 +1,24 @@
 
-import os.path, hashlib, time, pwd
+import os.path, hashlib, time, pwd, random, string
+char_set = string.ascii_letters + string.digits
 
 USEREUID = os.geteuid()
 USER_UID = pwd.getpwnam(os.getlogin())[2]
 USER_GID = pwd.getpwnam(os.getlogin())[3]
+
+def randomString(j = 1):
+	return ''.join(random.sample(char_set, j))
+
+def userId(str_):
+	_raw = str_.split('/')
+	if len(_raw) <= 1 :
+		return USER_UID, USER_GID
+	else :
+		if _raw[0].isdigit() : u = int(_raw[0])
+		else : u = USER_UID
+		if _raw[1].isdigit() : g = int(_raw[1])
+		else : g = USER_GID
+		return u, g
 
 def usersHOME_Detect():
 	userHOMEs = []
@@ -68,7 +83,7 @@ def excludesActivate(HOME = None):
 def readTargets():
 	targets = []
 	if os.path.isfile('/etc/thrifty.targets') :
-		with open() as f :
+		with open('/etc/thrifty.targets', 'rb') as f :
 			path_ = f.read()
 			path = path_.split('\n')
 			for path_ in path :
@@ -115,3 +130,10 @@ def listTDir(_dir, tab = '\t', Targets = []):
 		print tab, err
 	finally : pass
 	return List
+
+def readFile(path_ = ''):
+	if os.path.isfile(path_) :
+		with open(path_, 'rb') as f :
+			text = f.read()
+	else : text = 'error in open file %s' % path_
+	return text

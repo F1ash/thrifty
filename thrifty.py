@@ -17,7 +17,7 @@ HELP = \
 		1	-	fast, ~150MB memory\n\
 		2	-	very slow, ~100MB memory\n\
 		3	-	super fast, ~200MB !\n\
-			This action backs up "rpmdb-out" or brocken (file in rpmdb,\n\
+			This action backs up "rpmdb-out" or broken (file in rpmdb,\n\
 			but checksum mismatched) files from own HOME only (user mode)\n\
 			or /etc, /var/named/chroot, /usr/local, <all real HOME> (root mode).\n\
 			Excludes specified in\n\
@@ -36,8 +36,10 @@ HELP = \
 			This action can be used to obtain the list of all "rpmdb-out" files.\n\
 			And after editing it can be recorded in the /etc/thrifty.targets\n\
 			for precise removal of files.\n\
+		-b (--broken) [dir0 dir1 .. dirN]\n\
+			-	get list of all broken "rpmdb" files to Log from dirNN.\n\
 		-f (--file) file\n\
-			-	check the file (abspath) provided by some package and brocken\n\
+			-	check the file (abspath) provided by some package and broken\n\
 		-h (--help)\n\
 			-	help\n\
 	'
@@ -213,6 +215,50 @@ class FileSniffer():
 						elif fileHash(name) == item[12] :
 							dirList.remove(name)
 
+	def brokenTask(self, dirPath = []):
+		print "Get broken in :\n", dirPath
+		try :
+			print dateStamp(), 'create dirList beginning...'
+			Files = []
+			for path_ in dirPath :
+				Files = Files + listDir(path_)
+			print dateStamp(), 'dirList created'
+			matched = []
+			self.getBroken(matched, Files)
+			print dateStamp(), 'matched fileList created'
+			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
+			with open(log, 'ab') as f :
+				for item in matched :
+					f.write(item)
+			if os.path.isfile(log) : setFileState(log)
+			if self.save_log_name :
+				name_ = '/dev/shm/thrifty.lastTask'
+				with open(name_, 'wb') as f :
+					f.write(log)
+				if os.path.isfile(name_) : setFileState(name_)
+			print 'Log in : %s' % log
+		except KeyboardInterrupt, err :
+			print err
+			self.stop = True
+		except IOError, err :
+			print err
+		finally : pass
+
+	def getBroken(self, matched, dirList = []):
+		mi = ts.dbMatch()
+		for h in mi.__iter__() :
+			if self.stop : break
+			fi = h.fiFromHeader()
+			for item in fi.__iter__() :
+				if self.stop : break
+				#print item
+				name = item[0]
+				if name in dirList :
+					if fileHash(name) != item[12] :
+						#dirList.remove(name)
+						packageName = h['name'] ##+ '-' + h['version'] + '-' + h['release']
+						matched.append(''.join((name, ' ', packageName, '\n')))
+
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
 		self._data = ('','','')
@@ -224,7 +270,7 @@ class FileSniffer():
 			if len(res) == 1 :
 				toArchive = None if _fileHash == res[0][2] else res[0][1]
 				if infoShow :
-					print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'Brocken'
+					print 'Is packaged:', absPath, 'Safe' if toArchive is None else 'broken'
 					self._data = (res[0][0], res[0][2], _fileHash if _fileHash is not None else '--')
 			elif len(res) > 1 :
 				if infoShow :
@@ -233,7 +279,7 @@ class FileSniffer():
 			elif len(res) < 1 :
 				if infoShow :
 					print 'Not packaged:', absPath
-					self._data = ('Not packaded', '--', _fileHash if _fileHash is not None else '--')
+					self._data = ('Not packaged', '--', _fileHash if _fileHash is not None else '--')
 				toArchive = absPath
 		return toArchive
 
@@ -290,7 +336,7 @@ def __del__():
 
 if __name__ == '__main__':
 	parameters = sys.argv
-	mode_ = parameters[1] if len(parameters) > 1 else 'brocken'
+	mode_ = parameters[1] if len(parameters) > 1 else 'broken'
 	save_log_name = False
 	if mode_.startswith('G:') :
 		save_log_name = True
@@ -328,10 +374,17 @@ if __name__ == '__main__':
 				dirPath = parameters[2:] if len(parameters)>2 else []
 				job = FileSniffer(save_log_name)
 				job.cleanTask(dirPath, True)
+		elif mode in ('-b', '--broken') :
+			if USEREUID :
+				print 'RootMode necessary for search broken files.'
+			else :
+				dirPath = parameters[2:] if len(parameters)>2 else []
+				job = FileSniffer(save_log_name)
+				job.brokenTask(dirPath)
 		elif mode in ('-h', '--help') :
 			print HELP
 		else :
-			print 'Brocken command : %s\n%s' % (parameters, HELP)
+			print 'broken command : %s\n%s' % (parameters, HELP)
 	except KeyboardInterrupt , err :
 		print err
 	finally : print 'Bye...'

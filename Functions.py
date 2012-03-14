@@ -99,7 +99,7 @@ def listDir(_dir, tab = '\t', Excludes = []):
 			path_ = os.path.join(_dir, name)
 			if os.path.islink(path_) : continue	## links ignored
 			if os.path.isfile(path_) :
-				if path_ not in Excludes : List.append(path_)
+				if path_ not in Excludes and path_ not in List : List.append(path_)
 			elif os.path.isdir(path_) and path_ not in Excludes :
 				List = List + listDir(path_, tab + '\t', Excludes)
 	except OSError, err :
@@ -115,11 +115,11 @@ def listTDir(_dir, tab = '\t', Targets = []):
 			path_ = os.path.join(_dir, name)
 			if os.path.islink(path_) : continue	## links ignored
 			if os.path.isfile(path_) :
-				if Targets == [] :
+				if Targets == [] and path_ not in List :
 					List.append(path_)
 				else :
 					for target in Targets :
-						if path_.count(target) :
+						if path_.count(target) and path_ not in List :
 							List.append(path_)
 							break
 			elif os.path.isdir(path_) :

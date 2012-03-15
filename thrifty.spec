@@ -1,5 +1,5 @@
 Name: thrifty
-Version: 0.20
+Version: 0.25
 Release: 1%{?dist}
 Summary: Utility for archiving or cleaning "rpmdb-out" files
 Summary(ru): Утилита для архивирования и очистки "не-пакетных" файлов
@@ -15,11 +15,13 @@ BuildRequires: desktop-file-utils
 
 %description
 Thrifty
-Utility for archiving or cleaning "rpmdb-out" files
+Utility for archiving or cleaning "rpmdb-out" files and
+verifying brocken "rpmdb" files in specified catalogs
 
 %description -l ru
 Thrifty
-Утилита для архивирования и очистки "не-пакетных" файлов
+Утилита для архивирования или очистки "не-пакетных" файлов
+и проверки повреждённых "пакетных" файлов в заданных каталогах.
 
 %prep
 %setup -q
@@ -43,6 +45,9 @@ install -D -m 644 -p Functions.py $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 rm -rf $RPM_BUILD_ROOT
 
 %changelog
+
+* Sat Mar 15 2012 Fl@sh <kaperang07@gmail.com> - 0.25-1
+- version updated
 
 * Sat Mar 13 2012 Fl@sh <kaperang07@gmail.com> - 0.20-1
 - version updated

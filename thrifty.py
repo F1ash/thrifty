@@ -36,8 +36,13 @@ HELP = \
 			This action can be used to obtain the list of all "rpmdb-out" files.\n\
 			And after editing it can be recorded in the /etc/thrifty.targets\n\
 			for precise removal of files.\n\
-		-b (--broken) [dir0 dir1 .. dirN]\n\
+		-b* (--broken*) [dir0 dir1 .. dirN]\n\
 			-	get list of all broken "rpmdb" files to Log from dirNN.\n\
+			*	mix from {M, O}, \n\
+			-b	is a default mode of check : check size & hash of file;\n\
+			M	add check of the file`s mode;\n\
+			O	add check of the file`s uid & gid;\n\
+			(Example: -bOM, -bMO, --brokenO, --brokenMO)\n\
 		-f (--file) file\n\
 			-	check the file (abspath) provided by some package and broken\n\
 		-h (--help)\n\
@@ -215,7 +220,7 @@ class FileSniffer():
 						elif fileHash(name) == item[12] :
 							dirList.remove(name)
 
-	def brokenTask(self, dirPath = []):
+	def brokenTask(self, dirPath = [], control = [False, False]):
 		print "Get broken in :\n", dirPath
 		try :
 			print dateStamp(), 'create dirList beginning...'
@@ -224,7 +229,7 @@ class FileSniffer():
 				Files = Files + listDir(path_)
 			print dateStamp(), 'dirList created'
 			matched = []
-			self.getBroken(matched, Files)
+			self.getBroken(matched, Files, control)
 			print dateStamp(), 'matched fileList created'
 			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
 			with open(log, 'ab') as f :
@@ -244,18 +249,32 @@ class FileSniffer():
 			print err
 		finally : pass
 
-	def getBroken(self, matched, dirList = []):
+	def getBroken(self, matched, dirList = [], control = [False, False]):
 		mi = ts.dbMatch()
 		for h in mi.__iter__() :
 			if self.stop : break
 			fi = h.fiFromHeader()
 			for item in fi.__iter__() :
 				if self.stop : break
-				#print item
-				name = item[0]
+				#a = (item[0], item[1], item[2], item[3], item[10], item[11], item[12])
+				#b = (fi.FN(), fi.FSize(), fi.FMode(), \
+				#	fi.FMtime(), fi.FUser(), fi.FGroup(), fi.MD5())
+				#if a != b : print a, '\n', b
+				name = fi.FN()
 				if name in dirList :
-					if fileHash(name) != item[12] :
-						#dirList.remove(name)
+					fileState = os.stat(name)
+					badFile = False
+					if fileHash(name) != fi.MD5() or fileState.st_size != fi.FSize() :
+						badFile = True
+					if not badFile and control[0] and (fileState.st_mode != fi.FMode()) :
+						badFile = True
+					if not badFile and control[1] and \
+							(userName(fileState.st_uid) != fi.FUser() or \
+							userName(fileState.st_gid) != fi.FGroup()) :
+						badFile = True
+					#if not badFile and control[3] and (int(fileState.st_mtime) != fi.FMtime()) :
+					#	badFile = True
+					if badFile :
 						packageName = h['name'] ##+ '-' + h['version'] + '-' + h['release']
 						matched.append(''.join((name, ' ', packageName, '\n')))
 
@@ -374,13 +393,20 @@ if __name__ == '__main__':
 				dirPath = parameters[2:] if len(parameters)>2 else []
 				job = FileSniffer(save_log_name)
 				job.cleanTask(dirPath, True)
-		elif mode in ('-b', '--broken') :
+		elif mode.startswith('-b') or mode.startswith('--broken') :
 			if USEREUID :
 				print 'RootMode necessary for search broken files.'
 			else :
+				if mode.startswith('-b') :
+					level = mode[2:]
+				else :
+					level = mode[8:]
+				control = [False, False]
+				if 'M' in level : control[0] = True
+				if 'O' in level : control[1] = True
 				dirPath = parameters[2:] if len(parameters)>2 else []
 				job = FileSniffer(save_log_name)
-				job.brokenTask(dirPath)
+				job.brokenTask(dirPath, control)
 		elif mode in ('-h', '--help') :
 			print HELP
 		else :

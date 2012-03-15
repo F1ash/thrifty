@@ -6,6 +6,15 @@ USEREUID = os.geteuid()
 USER_UID = pwd.getpwnam(os.getlogin())[2]
 USER_GID = pwd.getpwnam(os.getlogin())[3]
 
+def userName(uid) :
+	res = -1
+	try :
+		res = pwd.getpwuid(uid)[0]
+	except KeyError , err :
+		print err
+	finally : pass
+	return res
+
 def randomString(j = 1):
 	return ''.join(random.sample(char_set, j))
 

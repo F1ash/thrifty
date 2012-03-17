@@ -176,9 +176,10 @@ def inList(name, list_):
 			break
 	return res
 
-def reversedFileState(name, _size):
+def reversedFileState(name, _size, isLink):
 	with open(name, 'rb') as f :
 		bits = f.read(4)
+	if isLink : return _size, '0000000000000000000000000000000000000000000000000000000000000000'
 	if bits == '\x7fELF' :
 		exitCode = os.system('/usr/sbin/prelink -y ' + name + ' > /dev/shm/original_prog')
 		if exitCode == 256 :

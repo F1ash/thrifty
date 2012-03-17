@@ -250,6 +250,7 @@ class FileSniffer():
 
 	def getBroken(self, matched, dirList = [], control = [False, False]):
 		mi = ts.dbMatch()
+		linkHash = '0000000000000000000000000000000000000000000000000000000000000000'
 		for h in mi.__iter__() :
 			if self.stop : break
 			fi = h.fiFromHeader()
@@ -262,21 +263,27 @@ class FileSniffer():
 				name = fi.FN()
 				if inList(name, dirList) :
 					if not os.path.isfile(name) : continue
+					isLink = os.path.islink(name)
 					badFile = False
-					fileState = os.stat(name)
-					_size, sha256sum = reversedFileState(name, fileState.st_size) \
+					fileState = os.stat(name) if not isLink else os.lstat(name)
+					_size, sha256sum = reversedFileState(name, fileState.st_size, isLink) \
 						if prelinkInstalled and name in PrelinkCache \
-						else (fileState.st_size, fileHash(name))
+						else (fileState.st_size, linkHash if isLink else fileHash(name) )
 					if sha256sum != fi.MD5() or _size != fi.FSize() :
 						#print fi.FN()
 						#print fi.FSize(), fi.MD5()
 						#print _size, sha256sum
 						badFile = True
 					if not badFile and control[0] and (fileState.st_mode != fi.FMode()) :
+						print fi.FN()
+						print fileState.st_mode, ':', fi.FMode()
 						badFile = True
 					if not badFile and control[1] and \
 							(userName(fileState.st_uid) != fi.FUser() or \
 							userName(fileState.st_gid) != fi.FGroup()) :
+						print fi.FN()
+						print userName(fileState.st_uid), fi.FUser(), ':', \
+							  userName(fileState.st_gid), fi.FGroup()
 						badFile = True
 					#if not badFile and control[3] and (int(fileState.st_mtime) != fi.FMtime()) :
 					#	badFile = True
@@ -286,6 +293,7 @@ class FileSniffer():
 						##+ '-' + h['version'] + '-' + h['release']
 						matched.append(''.join((name, ' ', packageName, '\n')))
 						break
+		#print item
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None

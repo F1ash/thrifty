@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from Functions import *
-import os, sys, os.path, rpm, tarfile
+import os, sys, os.path, tarfile
 from stat import S_IRUSR, S_IWUSR, S_IRGRP, S_IWGRP, S_IROTH, S_IWOTH
 
 def setFileState(name_):
@@ -48,8 +48,6 @@ HELP = \
 		-h (--help)\n\
 			-	help\n\
 	'
-
-ts = rpm.TransactionSet()
 
 class FileSniffer():
 	def __init__(self, save_log_name = False, parent = None):
@@ -224,9 +222,10 @@ class FileSniffer():
 		print "Get broken in :\n", dirPath
 		try :
 			print dateStamp(), 'create dirList beginning...'
-			Files = []
-			for path_ in dirPath :
-				Files = Files + listDir(path_)
+			#Files = []
+			#for path_ in dirPath :
+			#	Files = Files + listDir(path_)
+			Files = optimizeList(dirPath)
 			print dateStamp(), 'dirList created'
 			matched = []
 			self.getBroken(matched, Files, control)
@@ -261,10 +260,17 @@ class FileSniffer():
 				#	fi.FMtime(), fi.FUser(), fi.FGroup(), fi.MD5())
 				#if a != b : print a, '\n', b
 				name = fi.FN()
-				if name in dirList :
-					fileState = os.stat(name)
+				if inList(name, dirList) :
+					if not os.path.isfile(name) : continue
 					badFile = False
-					if fileHash(name) != fi.MD5() or fileState.st_size != fi.FSize() :
+					fileState = os.stat(name)
+					_size, sha256sum = reversedFileState(name, fileState.st_size) \
+						if prelinkInstalled and name in PrelinkCache \
+						else (fileState.st_size, fileHash(name))
+					if sha256sum != fi.MD5() or _size != fi.FSize() :
+						#print fi.FN()
+						#print fi.FSize(), fi.MD5()
+						#print _size, sha256sum
 						badFile = True
 					if not badFile and control[0] and (fileState.st_mode != fi.FMode()) :
 						badFile = True
@@ -275,8 +281,11 @@ class FileSniffer():
 					#if not badFile and control[3] and (int(fileState.st_mtime) != fi.FMtime()) :
 					#	badFile = True
 					if badFile :
-						packageName = h['name'] ##+ '-' + h['version'] + '-' + h['release']
+						packageName = h['name'] if sha256sum != 256 \
+							else ' at least one of file`s dependencies has changed since prelinking'
+						##+ '-' + h['version'] + '-' + h['release']
 						matched.append(''.join((name, ' ', packageName, '\n')))
+						break
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None

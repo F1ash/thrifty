@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from Functions import *
-import os, sys, os.path, tarfile
+import os, sys, os.path, tarfile, stat
 from stat import S_IRUSR, S_IWUSR, S_IRGRP, S_IWGRP, S_IROTH, S_IWOTH
 
 def setFileState(name_):
@@ -38,11 +38,12 @@ HELP = \
 			for precise removal of files.\n\
 		-b* (--broken*) [dir0 dir1 .. dirN]\n\
 			-	get list of all broken "rpmdb" files to Log from dirNN.\n\
-			*	mix from {M, O}, \n\
+			*	mix from {M, O, T}, \n\
 			-b	is a default mode of check : check size & hash of file;\n\
 			M	add check of the file`s mode;\n\
 			O	add check of the file`s uid & gid;\n\
-			(Example: -bOM, -bMO, --brokenO, --brokenMO)\n\
+			T	add check of the file`s mtime;\n\
+			(Example: -bOM, -bMO, --brokenO, --brokenMTO)\n\
 		-f (--file) file\n\
 			-	check the file (abspath) provided by some package and broken\n\
 		-h (--help)\n\
@@ -218,7 +219,7 @@ class FileSniffer():
 						elif fileHash(name) == item[12] :
 							dirList.remove(name)
 
-	def brokenTask(self, dirPath = [], control = [False, False]):
+	def brokenTask(self, dirPath = [], control = [False, False, False]):
 		print "Get broken in :\n", dirPath
 		try :
 			print dateStamp(), 'create dirList beginning...'
@@ -248,52 +249,88 @@ class FileSniffer():
 			print err
 		finally : pass
 
-	def getBroken(self, matched, dirList = [], control = [False, False]):
+	def getBroken(self, matched, dirList = [], control = [False, False, False]):
+		'''
+		http://www.rpm.org/max-rpm/s1-rpm-verify-we-lied.html#AEN4498
+		'''
 		mi = ts.dbMatch()
-		linkHash = '0000000000000000000000000000000000000000000000000000000000000000'
 		for h in mi.__iter__() :
 			if self.stop : break
 			fi = h.fiFromHeader()
 			for item in fi.__iter__() :
 				if self.stop : break
-				#a = (item[0], item[1], item[2], item[3], item[10], item[11], item[12])
-				#b = (fi.FN(), fi.FSize(), fi.FMode(), \
-				#	fi.FMtime(), fi.FUser(), fi.FGroup(), fi.MD5())
-				#if a != b : print a, '\n', b
+				''' 'BN', 'DC', 'DN', 'DX', \
+					'Digest', 'FC', 'FClass', 'FColor', \
+					'FFlags', 'FGroup', \
+					'FLink', 'FMode', 'FMtime', 'FN', \
+					'FRdev', 'FSize', 'FState', 'FUser', \
+					'FX', 'MD5', 'VFlags' '''
 				name = fi.FN()
 				if inList(name, dirList) :
-					if not os.path.isfile(name) : continue
-					isLink = os.path.islink(name)
+					if not os.path.lexists(name) :
+						# file or dir from package not exist in system
+						packageName = h['name']   ##+ '-' + h['version'] + '-' + h['release']
+						matched.append(''.join((name, ' ', packageName, ' NE', '\n')))
+						print name, 'not exist in system'
+						break
+					itemState = os.lstat(name)
+					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
+					isDir = True if stat.S_ISDIR(itemState.st_mode) else False
+					if isLink :
+						if fi.FLink().startswith('/') :
+							link = fi.FLink()
+						elif fi.FLink().startswith('../') :
+							link = os.path.realpath(fi.FLink())
+						else :
+							head, tail = os.path.split(name)
+							link = os.path.join(head, fi.FLink())
+						if link != os.path.realpath(name) :
+							# link from package not correct
+							packageName = h['name']   ##+ '-' + h['version'] + '-' + h['release']
+							matched.append(''.join((name, ' ', packageName, ' LI', '\n')))
+							print name
+							print fi.FLink(), os.path.realpath(name)
+							break
 					badFile = False
-					fileState = os.stat(name) if not isLink else os.lstat(name)
-					_size, sha256sum = reversedFileState(name, fileState.st_size, isLink) \
-						if prelinkInstalled and name in PrelinkCache \
-						else (fileState.st_size, linkHash if isLink else fileHash(name) )
-					if sha256sum != fi.MD5() or _size != fi.FSize() :
-						#print fi.FN()
-						#print fi.FSize(), fi.MD5()
-						#print _size, sha256sum
+					error = ''
+					if not isDir and not isLink :
+						_size, sha256sum = reversedFileState(name, itemState.st_size) \
+							if prelinkInstalled and name in PrelinkCache \
+							else (itemState.st_size, fileHash(name))
+					if not isDir and not isLink and \
+							(sha256sum != fi.MD5() or _size != fi.FSize()) :
+						print name
+						print fi.FSize(), fi.MD5()
+						print _size, sha256sum
+						error = 'HS'
 						badFile = True
-					if not badFile and control[0] and (fileState.st_mode != fi.FMode()) :
-						print fi.FN()
-						print fileState.st_mode, ':', fi.FMode()
+					if not badFile and control[0] and \
+							(int(itemState.st_mode) != fi.FMode()) :
+						print name
+						print itemState.st_mode, ':', fi.FMode()
+						error = 'ME'
 						badFile = True
 					if not badFile and control[1] and \
-							(userName(fileState.st_uid) != fi.FUser() or \
-							userName(fileState.st_gid) != fi.FGroup()) :
-						print fi.FN()
-						print userName(fileState.st_uid), fi.FUser(), ':', \
-							  userName(fileState.st_gid), fi.FGroup()
+							(userName(itemState.st_uid) != fi.FUser() or \
+							userName(itemState.st_gid) != fi.FGroup()) :
+						print name
+						print userName(itemState.st_uid), fi.FUser(), ':', \
+							  userName(itemState.st_gid), fi.FGroup()
+						error = 'OE'
 						badFile = True
-					#if not badFile and control[3] and (int(fileState.st_mtime) != fi.FMtime()) :
-					#	badFile = True
+					if not badFile and not isDir and not isLink and control[2] and \
+							(int(itemState.st_mtime) != fi.FMtime()) :
+						print name
+						print int(itemState.st_mtime), fi.FMtime()
+						print name, ':\n', itemState.st_mtime
+						error = 'TE'
+						badFile = True
 					if badFile :
 						packageName = h['name'] if sha256sum != 256 \
 							else ' at least one of file`s dependencies has changed since prelinking'
 						##+ '-' + h['version'] + '-' + h['release']
-						matched.append(''.join((name, ' ', packageName, '\n')))
+						matched.append(''.join((name, ' ', packageName, ' ', error, '\n')))
 						break
-		#print item
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
@@ -418,9 +455,10 @@ if __name__ == '__main__':
 					level = mode[2:]
 				else :
 					level = mode[8:]
-				control = [False, False]
+				control = [False, False, False]
 				if 'M' in level : control[0] = True
 				if 'O' in level : control[1] = True
+				if 'T' in level : control[2] = True
 				dirPath = parameters[2:] if len(parameters)>2 else []
 				job = FileSniffer(save_log_name)
 				job.brokenTask(dirPath, control)

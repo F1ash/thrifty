@@ -176,16 +176,15 @@ def inList(name, list_):
 			break
 	return res
 
-def reversedFileState(name, _size, isLink):
+def reversedFileState(name, _size):
 	with open(name, 'rb') as f :
 		bits = f.read(4)
-	if isLink : return _size, '0000000000000000000000000000000000000000000000000000000000000000'
 	if bits == '\x7fELF' :
 		exitCode = os.system('/usr/sbin/prelink -y ' + name + ' > /dev/shm/original_prog')
 		if exitCode == 256 :
 			_hash = exitCode
 		else :
-			_size = os.stat('/dev/shm/original_prog').st_size
+			_size = os.lstat('/dev/shm/original_prog').st_size
 			_hash = fileHash('/dev/shm/original_prog')
 		os.remove('/dev/shm/original_prog')
 	else :
@@ -211,7 +210,7 @@ if prelinkInstalled :
 			_PrelinkCache.append(path)
 	PrelinkCache = []
 	for item in _PrelinkCache :
-		if item not in PrelinkCache:
+		if item not in PrelinkCache :
 			PrelinkCache.append(item)
 	#print len(_PrelinkCache), len(PrelinkCache)
 	del _PrelinkCache

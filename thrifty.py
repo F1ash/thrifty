@@ -13,10 +13,10 @@ HELP = \
 	Utility for archiving or cleaning "rpmdb-out" files.\n\
 	\n\
 	thrifty [option]\n\
-		0	-	very fast, ~200MB memory\n\
-		1	-	fast, ~150MB memory\n\
-		2	-	very slow, ~100MB memory\n\
-		3	-	super fast, ~200MB !\n\
+		0	-	very fast\n\
+		1	-	fast\n\
+		2	-	very slow\n\
+		3	-	super fast\n\
 			This action backs up "rpmdb-out" or broken (file in rpmdb,\n\
 			but checksum mismatched) files from own HOME only (user mode)\n\
 			or /etc, /var/named/chroot, /usr/local, <all real HOME> (root mode).\n\
@@ -276,34 +276,45 @@ class FileSniffer():
 					itemState = os.lstat(name)
 					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
 					isDir = True if stat.S_ISDIR(itemState.st_mode) else False
+					isReg = True if stat.S_ISREG(itemState.st_mode) else False
 					if isLink :
+						head, tail = os.path.split(name)
 						if fi.FLink().startswith('/') :
 							link = fi.FLink()
 						elif fi.FLink().startswith('../') :
-							link = os.path.realpath(fi.FLink())
+							_link = fi.FLink()
+							while _link.startswith('../') :
+								_link = _link[3:]
+								head = os.path.split(head)[0]
+							link = os.path.join(head, _link)
+						elif fi.FLink().startswith('./') :
+							link = os.path.join(head, os.path.split(fi.FLink())[1])
 						else :
-							head, tail = os.path.split(name)
 							link = os.path.join(head, fi.FLink())
 						if link != os.path.realpath(name) :
 							# link from package not correct
 							packageName = h['name']   ##+ '-' + h['version'] + '-' + h['release']
 							matched.append(''.join((name, ' ', packageName, ' LI', '\n')))
 							print name
-							print fi.FLink(), os.path.realpath(name)
+							print fi.FLink(), os.path.realpath(name), link
 							break
 					badFile = False
 					error = ''
-					if not isDir and not isLink :
+					if not isDir and not isLink and isReg :
 						_size, sha256sum = reversedFileState(name, itemState.st_size) \
 							if prelinkInstalled and name in PrelinkCache \
 							else (itemState.st_size, fileHash(name))
-					if not isDir and not isLink and \
+					if not isDir and not isLink and isReg and \
 							(sha256sum != fi.MD5() or _size != fi.FSize()) :
-						print name
-						print fi.FSize(), fi.MD5()
-						print _size, sha256sum
-						error = 'HS'
-						badFile = True
+						# repeat for lost in prelink.cache
+						if sha256sum == 256 or \
+								(reversedFileState(name, itemState.st_size)) != \
+								(fi.FSize(), fi.MD5()) :
+							print name
+							print fi.FSize(), fi.MD5()
+							print _size, sha256sum
+							error = 'HS'
+							badFile = True
 					if not badFile and control[0] and \
 							(int(itemState.st_mode) != fi.FMode()) :
 						print name
@@ -318,11 +329,11 @@ class FileSniffer():
 							  userName(itemState.st_gid), fi.FGroup()
 						error = 'OE'
 						badFile = True
-					if not badFile and not isDir and not isLink and control[2] and \
+					if not badFile and not isDir and not isLink \
+							and isReg and control[2] and \
 							(int(itemState.st_mtime) != fi.FMtime()) :
 						print name
 						print int(itemState.st_mtime), fi.FMtime()
-						print name, ':\n', itemState.st_mtime
 						error = 'TE'
 						badFile = True
 					if badFile :

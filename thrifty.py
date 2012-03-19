@@ -270,8 +270,8 @@ class FileSniffer():
 					if not os.path.lexists(name) :
 						# file or dir from package not exist in system
 						packageName = h['name']   ##+ '-' + h['version'] + '-' + h['release']
-						matched.append(''.join((name, ' ', packageName, ' NE', '\n')))
-						print name, 'not exist in system'
+						matched.append(''.join((name, ' ', packageName, ' NotExist', '\n')))
+						#print name, 'not exist in system'
 						break
 					itemState = os.lstat(name)
 					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
@@ -294,9 +294,9 @@ class FileSniffer():
 						if link != os.path.realpath(name) :
 							# link from package not correct
 							packageName = h['name']   ##+ '-' + h['version'] + '-' + h['release']
-							matched.append(''.join((name, ' ', packageName, ' LI', '\n')))
-							print name
-							print fi.FLink(), os.path.realpath(name), link
+							matched.append(''.join((name, ' ', packageName, ' LinkIncorrect', '\n')))
+							#print name
+							#print fi.FLink(), os.path.realpath(name), link
 							break
 					badFile = False
 					error = ''
@@ -310,31 +310,31 @@ class FileSniffer():
 						if sha256sum == 256 or \
 								(reversedFileState(name, itemState.st_size)) != \
 								(fi.FSize(), fi.MD5()) :
-							print name
-							print fi.FSize(), fi.MD5()
-							print _size, sha256sum
-							error = 'HS'
+							#print name
+							#print fi.FSize(), fi.MD5()
+							#print _size, sha256sum
+							error = 'Hash or Size Mismatched'
 							badFile = True
 					if not badFile and control[0] and \
 							(int(itemState.st_mode) != fi.FMode()) :
-						print name
-						print itemState.st_mode, ':', fi.FMode()
-						error = 'ME'
+						#print name
+						#print itemState.st_mode, ':', fi.FMode()
+						error = 'FileMode Error'
 						badFile = True
 					if not badFile and control[1] and \
 							(userName(itemState.st_uid) != fi.FUser() or \
 							userName(itemState.st_gid) != fi.FGroup()) :
-						print name
-						print userName(itemState.st_uid), fi.FUser(), ':', \
-							  userName(itemState.st_gid), fi.FGroup()
-						error = 'OE'
+						#print name
+						#print userName(itemState.st_uid), fi.FUser(), ':', \
+						#	  userName(itemState.st_gid), fi.FGroup()
+						error = 'Owners Mismatched'
 						badFile = True
 					if not badFile and not isDir and not isLink \
 							and isReg and control[2] and \
 							(int(itemState.st_mtime) != fi.FMtime()) :
-						print name
-						print int(itemState.st_mtime), fi.FMtime()
-						error = 'TE'
+						#print name
+						#print int(itemState.st_mtime), fi.FMtime()
+						error = 'FileMtime Mismatched'
 						badFile = True
 					if badFile :
 						packageName = h['name'] if sha256sum != 256 \

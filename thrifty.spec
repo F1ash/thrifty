@@ -1,5 +1,5 @@
 Name: thrifty
-Version: 0.25
+Version: 0.27
 Release: 1%{?dist}
 Summary: Utility for archiving or cleaning "rpmdb-out" files
 Summary(ru): Утилита для архивирования и очистки "не-пакетных" файлов
@@ -45,6 +45,9 @@ install -D -m 644 -p Functions.py $RPM_BUILD_ROOT/%{_datadir}/%{name}/
 rm -rf $RPM_BUILD_ROOT
 
 %changelog
+
+* Sat Mar 19 2012 Fl@sh <kaperang07@gmail.com> - 0.27-1
+- version updated
 
 * Sat Mar 15 2012 Fl@sh <kaperang07@gmail.com> - 0.25-1
 - version updated

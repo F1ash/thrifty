@@ -378,8 +378,9 @@ class FileSniffer():
 							link = os.path.join(head, _link)
 						elif fi.FLink().startswith('./') :
 							link = os.path.join(head, os.path.split(fi.FLink())[1])
-						else :
+						elif fi.FLink() != '' :
 							link = os.path.join(head, fi.FLink())
+						else : link = '--'
 						data['linkP'] = link
 						data['linkR'] = os.path.realpath(name)
 					if not isDir and not isLink and isReg :
@@ -513,7 +514,7 @@ if __name__ == '__main__':
 			if not os.access(fileName, os.R_OK) :
 				print 'Permission denied.'
 				with open(name_, 'wb') as f :
-					f.write('package:Permissin denied.')
+					f.write('package:Permissin denied or File not exist.\nmulti:0')
 			else :
 				data, multi = job.verifyFile(fileName)
 				with open(name_, 'wb') as f :

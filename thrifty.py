@@ -522,8 +522,8 @@ if __name__ == '__main__':
 						if save_log_name :
 							f.write('%s:%s\n' % (item, str(data[item])))
 					f.write('multi:' + str(multi))
-				if os.path.isfile(name_) : setFileState(name_)
 				if multi > 1 : print 'WARNING: not unique data in rpmDB (%s records)' % multi
+			if os.path.isfile(name_) : setFileState(name_)
 		elif mode in ('-c', '--clean') :
 			if USEREUID :
 				print 'RootMode necessary for clean.'

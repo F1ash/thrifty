@@ -307,14 +307,24 @@ class FileSniffer():
 					if not isDir and not isLink and isReg and \
 							(sha256sum != fi.MD5() or _size != fi.FSize()) :
 						# repeat for lost in prelink.cache
-						if sha256sum == 256 or \
-								(reversedFileState(name, itemState.st_size)) != \
-								(fi.FSize(), fi.MD5()) :
+						# 256 is fail exitCode of `prelink -y <name>`
+						if str(sha256sum) == '256' :
 							#print name
 							#print fi.FSize(), fi.MD5()
 							#print _size, sha256sum
 							error = 'Hash or Size Mismatched'
 							badFile = True
+						else :
+							__size, _sha256sum = reversedFileState(name, itemState.st_size)
+							if str(_sha256sum) == '256' or \
+									_sha256sum != fi.MD5() or __size != fi.FSize() :
+								_size = __size
+								sha256sum = _sha256sum
+								#print name
+								#print fi.FSize(), fi.MD5()
+								#print _size, sha256sum
+								error = 'Hash or Size Mismatched'
+								badFile = True
 					if not badFile and control[0] and \
 							(int(itemState.st_mode) != fi.FMode()) :
 						#print name
@@ -342,6 +352,65 @@ class FileSniffer():
 						##+ '-' + h['version'] + '-' + h['release']
 						matched.append(''.join((name, ' ', packageName, ' ', error, '\n')))
 						break
+
+	def verifyFile(self, fileName):
+		mi = ts.dbMatch()
+		data = {}
+		for h in mi.__iter__() :
+			if fileName not in h['FILENAMES'] : continue
+			fi = h.fiFromHeader()
+			for item in fi.__iter__() :
+				name = fi.FN()
+				if name == fileName :
+					itemState = os.lstat(name)
+					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
+					isDir = True if stat.S_ISDIR(itemState.st_mode) else False
+					isReg = True if stat.S_ISREG(itemState.st_mode) else False
+					if isLink :
+						head, tail = os.path.split(name)
+						if fi.FLink().startswith('/') :
+							link = fi.FLink()
+						elif fi.FLink().startswith('../') :
+							_link = fi.FLink()
+							while _link.startswith('../') :
+								_link = _link[3:]
+								head = os.path.split(head)[0]
+							link = os.path.join(head, _link)
+						elif fi.FLink().startswith('./') :
+							link = os.path.join(head, os.path.split(fi.FLink())[1])
+						else :
+							link = os.path.join(head, fi.FLink())
+						data['linkP'] = link
+						data['linkR'] = os.path.realpath(name)
+					if not isDir and not isLink and isReg :
+						_size, sha256sum = reversedFileState(name, itemState.st_size) \
+							if prelinkInstalled and name in PrelinkCache \
+							else (itemState.st_size, fileHash(name))
+					if not isDir and not isLink and isReg :
+						if (sha256sum != fi.MD5() or _size != fi.FSize()) :
+							# repeat for lost in prelink.cache
+							if str(sha256sum) != '256' :
+								__size, _sha256sum = reversedFileState(name, itemState.st_size)
+								if str(_sha256sum) != '256' :
+									_size = __size
+									sha256sum = _sha256sum
+						data['sizeR'] = _size
+						data['hashR'] = sha256sum
+						data['sizeP'] = fi.FSize()
+						data['hashP'] = fi.MD5()
+					data['modeR'] = int(itemState.st_mode)
+					data['modeP'] = fi.FMode()
+					data['uidR'] = userName(itemState.st_uid)
+					data['uidP'] = fi.FUser()
+					data['gidR'] = userName(itemState.st_gid)
+					data['gidP'] = fi.FGroup()
+					if not isDir and not isLink and isReg :
+						data['mtimeR'] = int(itemState.st_mtime)
+						data['mtimeP'] = fi.FMtime()
+					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
+					data['package'] = packageName
+					break
+		return data
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
@@ -437,13 +506,15 @@ if __name__ == '__main__':
 		elif mode in ('-f', '--file') :
 			fileName = os.path.abspath(parameters[2]) if len(parameters)>2 else ''
 			job = FileSniffer()
-			job.checkWarningFile(fileName, 1, True)
-			if save_log_name :
-				name_ = '/dev/shm/thrifty.lastTask'
-				with open(name_, 'ab') as f :
-					for str_ in job._data :
-						f.write(str_ + '\n')
-				if os.path.isfile(name_) : setFileState(name_)
+			#job.checkWarningFile(fileName, 1, True)
+			data = job.verifyFile(fileName)
+			name_ = '/dev/shm/thrifty.lastTask'
+			with open(name_, 'wb') as f :
+				for item in data.iterkeys() :
+					print '%s : %s' % (item, data[item])
+					if save_log_name :
+						f.write('%s:%s\n' % (item, str(data[item])))
+			if os.path.isfile(name_) : setFileState(name_)
 		elif mode in ('-c', '--clean') :
 			if USEREUID :
 				print 'RootMode necessary for clean.'

@@ -232,7 +232,7 @@ class FileSniffer():
 			self.getBroken(matched, Files, control)
 			print dateStamp(), 'matched fileList created'
 			log = os.path.join('/tmp', 'thrifty_'+ dateStamp()[:-3])
-			with open(log, 'ab') as f :
+			with open(log, 'wb') as f :
 				for item in matched :
 					f.write(item)
 			if os.path.isfile(log) : setFileState(log)
@@ -304,27 +304,23 @@ class FileSniffer():
 						_size, sha256sum = reversedFileState(name, itemState.st_size) \
 							if prelinkInstalled and name in PrelinkCache \
 							else (itemState.st_size, fileHash(name))
-					if not isDir and not isLink and isReg and \
-							(sha256sum != fi.MD5() or _size != fi.FSize()) :
-						# repeat for lost in prelink.cache
-						# 256 is fail exitCode of `prelink -y <name>`
-						if str(sha256sum) == '256' :
-							#print name
-							#print fi.FSize(), fi.MD5()
-							#print _size, sha256sum
-							error = 'Hash or Size Mismatched'
-							badFile = True
-						else :
-							__size, _sha256sum = reversedFileState(name, itemState.st_size)
-							if str(_sha256sum) == '256' or \
-									_sha256sum != fi.MD5() or __size != fi.FSize() :
-								_size = __size
-								sha256sum = _sha256sum
+						#if not isDir and not isLink and isReg :
+						if (sha256sum != fi.MD5() or _size != fi.FSize()) :
+							# repeat for lost in prelink.cache
+							# 256 is fail exitCode of `prelink -y <name>`
+							if str(sha256sum) == '256' :
+								badFile = True
+							else :
+								_size, sha256sum = reversedFileState(name, itemState.st_size)
+								if str(sha256sum) != '256' :
+									if (sha256sum != fi.MD5() or _size != fi.FSize()) :
+										badFile = True
+								else : badFile = True
+							if badFile :
 								#print name
 								#print fi.FSize(), fi.MD5()
 								#print _size, sha256sum
 								error = 'Hash or Size Mismatched'
-								badFile = True
 					if not badFile and control[0] and \
 							(int(itemState.st_mode) != fi.FMode()) :
 						#print name
@@ -347,6 +343,7 @@ class FileSniffer():
 						error = 'FileMtime Mismatched'
 						badFile = True
 					if badFile :
+						#print item
 						packageName = h['name'] if sha256sum != 256 \
 							else ' at least one of file`s dependencies has changed since prelinking'
 						##+ '-' + h['version'] + '-' + h['release']
@@ -356,16 +353,19 @@ class FileSniffer():
 	def verifyFile(self, fileName):
 		mi = ts.dbMatch()
 		data = {}
+		multi = 0
 		for h in mi.__iter__() :
 			if fileName not in h['FILENAMES'] : continue
 			fi = h.fiFromHeader()
 			for item in fi.__iter__() :
 				name = fi.FN()
 				if name == fileName :
+					#print item
 					itemState = os.lstat(name)
 					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
 					isDir = True if stat.S_ISDIR(itemState.st_mode) else False
 					isReg = True if stat.S_ISREG(itemState.st_mode) else False
+					dev = itemState.st_dev
 					if isLink :
 						head, tail = os.path.split(name)
 						if fi.FLink().startswith('/') :
@@ -386,7 +386,7 @@ class FileSniffer():
 						_size, sha256sum = reversedFileState(name, itemState.st_size) \
 							if prelinkInstalled and name in PrelinkCache \
 							else (itemState.st_size, fileHash(name))
-					if not isDir and not isLink and isReg :
+						#if not isDir and not isLink and isReg :
 						if (sha256sum != fi.MD5() or _size != fi.FSize()) :
 							# repeat for lost in prelink.cache
 							if str(sha256sum) != '256' :
@@ -410,7 +410,9 @@ class FileSniffer():
 					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
 					data['package'] = packageName
 					break
-		return data
+			multi += 1
+			#print data, multi
+		return data, multi
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
@@ -507,14 +509,21 @@ if __name__ == '__main__':
 			fileName = os.path.abspath(parameters[2]) if len(parameters)>2 else ''
 			job = FileSniffer()
 			#job.checkWarningFile(fileName, 1, True)
-			data = job.verifyFile(fileName)
 			name_ = '/dev/shm/thrifty.lastTask'
-			with open(name_, 'wb') as f :
-				for item in data.iterkeys() :
-					print '%s : %s' % (item, data[item])
-					if save_log_name :
-						f.write('%s:%s\n' % (item, str(data[item])))
-			if os.path.isfile(name_) : setFileState(name_)
+			if not os.access(fileName, os.R_OK) :
+				print 'Permission denied.'
+				with open(name_, 'wb') as f :
+					f.write('package:Permissin denied.')
+			else :
+				data, multi = job.verifyFile(fileName)
+				with open(name_, 'wb') as f :
+					for item in data.iterkeys() :
+						print '%s : %s' % (item, data[item])
+						if save_log_name :
+							f.write('%s:%s\n' % (item, str(data[item])))
+					f.write('multi:' + str(multi))
+				if os.path.isfile(name_) : setFileState(name_)
+				if multi > 1 : print 'WARNING: not unique data in rpmDB (%s records)' % multi
 		elif mode in ('-c', '--clean') :
 			if USEREUID :
 				print 'RootMode necessary for clean.'

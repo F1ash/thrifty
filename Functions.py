@@ -1,5 +1,6 @@
 
 import os.path, hashlib, time, pwd, random, string, rpm
+from isprelink import isprelink
 char_set = string.ascii_letters + string.digits
 
 USEREUID = os.geteuid()
@@ -8,7 +9,6 @@ USER_GID = pwd.getpwnam(os.getlogin())[3]
 
 ts = rpm.TransactionSet()
 prelinkInstalled = True if len(ts.dbMatch('name', 'prelink')) else False
-global PrelinkCache
 
 def userName(uid) :
 	res = -1
@@ -178,8 +178,8 @@ def inList(name, list_):
 
 def reversedFileState(name, _size):
 	with open(name, 'rb') as f :
-		bits = f.read(4)
-	if bits == '\x7fELF' :
+		prelinked = isprelink(f.fileno())
+	if prelinked :
 		exitCode = os.system('/usr/sbin/prelink -y ' + name + ' > /dev/shm/original_prog')
 		if exitCode == 256 :
 			_hash = exitCode
@@ -190,27 +190,3 @@ def reversedFileState(name, _size):
 	else :
 		_hash = fileHash(name)
 	return _size, _hash
-
-if prelinkInstalled :
-	os.system('/usr/sbin/prelink -p > /dev/shm/prelink.cache')
-	cache_raw = readFile('/dev/shm/prelink.cache')
-	cache_str = cache_raw.split('\n')
-	os.remove('/dev/shm/prelink.cache')
-	_PrelinkCache = []
-	for item in cache_str :
-		chunks = item.split()
-		#print chunks
-		if len(chunks) > 0 :
-			if len(chunks) > 1 and chunks[1].count('(not prelinkable)') :
-				continue
-			if chunks[0][-1:] == ':' :
-				path = chunks[0][:-1]
-			else :
-				path = chunks[0]
-			_PrelinkCache.append(path)
-	PrelinkCache = []
-	for item in _PrelinkCache :
-		if item not in PrelinkCache :
-			PrelinkCache.append(item)
-	#print len(_PrelinkCache), len(PrelinkCache)
-	del _PrelinkCache

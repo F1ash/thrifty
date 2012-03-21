@@ -302,25 +302,14 @@ class FileSniffer():
 					error = ''
 					if not isDir and not isLink and isReg :
 						_size, sha256sum = reversedFileState(name, itemState.st_size) \
-							if prelinkInstalled and name in PrelinkCache \
+							if prelinkInstalled \
 							else (itemState.st_size, fileHash(name))
-						#if not isDir and not isLink and isReg :
 						if (sha256sum != fi.MD5() or _size != fi.FSize()) :
-							# repeat for lost in prelink.cache
-							# 256 is fail exitCode of `prelink -y <name>`
-							if str(sha256sum) == '256' :
-								badFile = True
-							else :
-								_size, sha256sum = reversedFileState(name, itemState.st_size)
-								if str(sha256sum) != '256' :
-									if (sha256sum != fi.MD5() or _size != fi.FSize()) :
-										badFile = True
-								else : badFile = True
-							if badFile :
-								#print name
-								#print fi.FSize(), fi.MD5()
-								#print _size, sha256sum
-								error = 'Hash or Size Mismatched'
+							#print name
+							#print fi.FSize(), fi.MD5()
+							#print _size, sha256sum
+							error = 'Hash or Size Mismatched'
+							badFile = True
 					if not badFile and control[0] and \
 							(int(itemState.st_mode) != fi.FMode()) :
 						#print name
@@ -385,16 +374,8 @@ class FileSniffer():
 						data['linkR'] = os.path.realpath(name)
 					if not isDir and not isLink and isReg :
 						_size, sha256sum = reversedFileState(name, itemState.st_size) \
-							if prelinkInstalled and name in PrelinkCache \
+							if prelinkInstalled \
 							else (itemState.st_size, fileHash(name))
-						#if not isDir and not isLink and isReg :
-						if (sha256sum != fi.MD5() or _size != fi.FSize()) :
-							# repeat for lost in prelink.cache
-							if str(sha256sum) != '256' :
-								__size, _sha256sum = reversedFileState(name, itemState.st_size)
-								if str(_sha256sum) != '256' :
-									_size = __size
-									sha256sum = _sha256sum
 						data['sizeR'] = _size
 						data['hashR'] = sha256sum
 						data['sizeP'] = fi.FSize()

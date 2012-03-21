@@ -382,6 +382,8 @@ class FileSniffer():
 						data['hashP'] = fi.MD5()
 					data['modeR'] = int(itemState.st_mode)
 					data['modeP'] = fi.FMode()
+					data['binModeR'] = oct(int(itemState.st_mode))
+					data['binModeP'] = oct(int(fi.FMode()))
 					data['uidR'] = userName(itemState.st_uid)
 					data['uidP'] = fi.FUser()
 					data['gidR'] = userName(itemState.st_gid)

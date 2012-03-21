@@ -352,14 +352,14 @@ class FileSniffer():
 
 	def verifyFile(self, fileName):
 		mi = ts.dbMatch()
-		data = {}
-		multi = 0
+		Data = []
 		for h in mi.__iter__() :
 			if fileName not in h['FILENAMES'] : continue
 			fi = h.fiFromHeader()
 			for item in fi.__iter__() :
 				name = fi.FN()
 				if name == fileName :
+					data = {}
 					#print item
 					itemState = os.lstat(name)
 					isLink = True if stat.S_ISLNK(itemState.st_mode) else False
@@ -408,12 +408,11 @@ class FileSniffer():
 					if not isDir and not isLink and isReg :
 						data['mtimeR'] = int(itemState.st_mtime)
 						data['mtimeP'] = fi.FMtime()
-					packageName = h['name'] + '-' + h['version'] + '-' + h['release']
+					packageName = h['name'] + '-' + h['version'] + '-' + h['release'] + '.' + h['arch']
 					data['package'] = packageName
+					Data.append(data)
 					break
-			multi += 1
-			#print data, multi
-		return data, multi
+		return Data
 
 	def checkWarningFile(self, absPath, mode, infoShow = False):
 		toArchive = None
@@ -514,15 +513,19 @@ if __name__ == '__main__':
 			if not os.access(fileName, os.R_OK) :
 				print 'Permission denied.'
 				with open(name_, 'wb') as f :
-					f.write('package:Permissin denied or File not exist.\nmulti:0')
+					f.write('package:Permissin denied or File not exist.\nmulti:0\n')
 			else :
-				data, multi = job.verifyFile(fileName)
-				with open(name_, 'wb') as f :
-					for item in data.iterkeys() :
-						print '%s : %s' % (item, data[item])
-						if save_log_name :
-							f.write('%s:%s\n' % (item, str(data[item])))
-					f.write('multi:' + str(multi))
+				Data = job.verifyFile(fileName)
+				multi = len(Data)
+				with open(name_, 'ab') as f :
+					for data in Data :
+						print '</package>'
+						f.write('</package>\n')
+						for item in data.iterkeys() :
+							print '%s : %s' % (item, data[item])
+							if save_log_name :
+								f.write('%s:%s\n' % (item, str(data[item])))
+						f.write('multi:' + str(multi) + '\n')
 				if multi > 1 : print 'WARNING: not unique data in rpmDB (%s records)' % multi
 			if os.path.isfile(name_) : setFileState(name_)
 		elif mode in ('-c', '--clean') :

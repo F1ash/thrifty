@@ -496,7 +496,7 @@ if __name__ == '__main__':
 			if not os.access(fileName, os.R_OK) :
 				print 'Permission denied.'
 				with open(name_, 'wb') as f :
-					f.write('package:Permissin denied or File not exist.\nmulti:0\n')
+					f.write('package:Permission denied or File not exist.\nmulti:0\n')
 			else :
 				Data = job.verifyFile(fileName)
 				multi = len(Data)
